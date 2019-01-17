@@ -3,10 +3,18 @@ import tkinter as tk
 from tkinter import ttk
 
 
+def xstr(s, nonestr=str(None)):
+    if s:
+        # Strip invalid characters.
+        return "".join([c for c in str(s) if ord(c) in range(65536)])
+    else:
+        return nonestr
+
+
 def setListBox(listbox, values):
     listbox.delete(0, listbox.size())
     for val in values:
-        listbox.insert(tk.END, "{}".format(val))
+        listbox.insert(tk.END, xstr(val, nonestr=""))
 
 
 class ToggleButton(ttk.Checkbutton):
@@ -47,14 +55,16 @@ class ToggleButton(ttk.Checkbutton):
 class MultiColumnListbox(tk.Frame):
     """use a ttk.TreeView as a multicolumn ListBox"""
 
-    def __init__(self, parent, headers, tabledata, multiselect=False, sortable=True, vscroll=True, hscroll=False, *args, **kwargs):
+    def __init__(self, parent, headers, tabledata, multiselect=False, sortable=True, vscroll=True, hscroll=False, nonestr=str("None"), *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.tree = None
         self.sortable = sortable
         self.headers = headers  # This must remain static.
+        self.nonestr = nonestr
 
         self.setup_widgets(headers, vscroll=vscroll, hscroll=hscroll)
         self.build_tree(headers, tabledata)
+
 
         if multiselect:
             self.tree.configure(selectmode=tk.NONE)
@@ -108,6 +118,10 @@ class MultiColumnListbox(tk.Frame):
         tree.heading(col, command=lambda col=col: self.sortby(tree, col, int(not descending)))
 
     def insert_item(self, item):
+        # Sanitize value strings
+        if item.get("values"):
+            item['values'] = [xstr(s, nonestr=self.nonestr) for s in item['values']]
+
         self.tree.insert('', tk.END, **item)
 
     def build_tree(self, headers, itemlist, resize=True):
