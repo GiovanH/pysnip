@@ -147,10 +147,8 @@ class Spool():
                 q = (len(self.queue) if self.queue else 0)
                 progress = (_max - (self.getNoRunningThreads() + q))
                 pbar.update(progress)
-                if progress == _max: 
-                    pbar.finish()
-                    return
             cb = updateProgressBar
+            cb()
 
         # assert not self.spoolThread.isAlive, "Background loop did not terminate"
         # Create a spoolloop, but block until it deploys all threads.
@@ -163,6 +161,9 @@ class Spool():
 
         assert len(self.queue) == 0, "Finished without deploying all threads"
         assert self.getNoRunningThreads() == 0, "Finished without finishing all threads"
+        
+        if cb:
+            pbar.finish()
 
         if resume:
             self.queue.clear()  # Create a fresh queue
