@@ -78,12 +78,20 @@ class Handler():
         self.basepath = basepath
         self.obj = None
 
+    def load(self):
+        return load(self.name, basepath=self.basepath, default=self.default)
+
     def __enter__(self):
-        self.obj = load(self.name, basepath=self.basepath, default=self.default)
+        self.obj = self.load()
         return self.obj
 
     def __exit__(self, type, value, traceback):
-        if self.readonly:
+        if not self.readonly:
+            # print("Saving.")
+            # print("{} -> {}".format(
+            #     len(self.load().keys()),
+            #     len(self.obj.keys())
+            # ))
             save(self.obj, self.name, basepath=self.basepath)
 
     def flush(self):
