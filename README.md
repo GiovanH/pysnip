@@ -51,6 +51,14 @@ Spools also have the ability to
 
 - Ensure all running tasks finish before starting more threads, by request
 
+## pwidgets.py
+
+Additional widgets for progressbar
+
+## snip.py
+
+Very basic helper functions.
+
 ## tkit.py
 
 Additional tkinter widgets and utility functions for GUI programming
