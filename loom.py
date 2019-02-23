@@ -9,6 +9,9 @@ Attributes:
 
 from time import sleep
 import threading
+import progressbar
+from pwidgets import DynamicProgressString
+from snip import execif
 
 necessary_threads = 1
 
@@ -39,7 +42,6 @@ def threadWait(threshhold=0, interval=1, quiet=True, use_pbar=True):
 
     pbar = None
     if use_pbar and (extraThreads() > threshhold):
-        import progressbar
         _max = extraThreads() - threshhold
         print("Finishing {} background jobs.".format(_max))
         pbar = progressbar.ProgressBar(max_value=_max, redirect_stdout=True)
@@ -80,7 +82,7 @@ class Spool():
     The spooler can start multiple threads at once.
     """
 
-    def __init__(self, quota, cfinish={}):
+    def __init__(self, quota, name=None, cfinish={}, belay=False):
         """Create a spool
         
         Args:
@@ -89,19 +91,19 @@ class Spool():
         """
         super(Spool, self).__init__()
         self.quota = quota
+        self.name = name
+        self.cfinish = cfinish
 
         self.queue = []
         self.running_threads = []
+
         self.flushing = 0
-
         self.spoolThread = None
-
-        self.cfinish = cfinish
-        
         self.background_spool = False
         self.dirty = threading.Event()
 
-        self.start()
+        if not belay:
+            self.start()
 
     def __enter__(self):
         return self
@@ -110,7 +112,7 @@ class Spool():
         self.finish(resume=False, **self.cfinish)
 
     def __str__(self):
-        return "{} at {}: {} threads queued, {}/{} currently running".format(type(self), hex(id(self)), len(self.queue), self.getNoRunningThreads(), self.quota)
+        return "{} at {}: {} threads queued, {}/{} currently running".format(type(self), hex(id(self)), len(self.queue), self.numRunningThreads, self.quota)
 
     # Interfaces
 
@@ -137,37 +139,52 @@ class Spool():
         # By default, we don't use a callback.
         cb = None
 
-        # Progress bar management, optional.
-        _max = self.getNoRunningThreads() + len(self.queue)
-        if use_pbar and _max > 0:
-            import progressbar
-            pbar = progressbar.ProgressBar(max_value=_max, redirect_stdout=True)
+        if verbose:
+            print(self)
 
-            def updateProgressBar():
+        # Progress bar management, optional.
+        _max = self.numRunningThreads + len(self.queue)
+        if use_pbar and _max > 0:
+            widgets = [
+                ("[{n}] ".format(n=self.name) if self.name else ' '), progressbar.Percentage(),
+                ' ', progressbar.SimpleProgress(format='%(value_s)s of %(max_value_s)s'),
+                ' ', progressbar.Bar(),
+                ' ', DynamicProgressString(name="state"),
+                ' ', progressbar.Timer(),
+                ' ', progressbar.AdaptiveETA(),
+            ]
+            progbar = progressbar.ProgressBar(max_value=_max, widgets=widgets, redirect_stdout=True)
+
+            def updateProgrssBar():
+                # Update progress bar.
                 q = (len(self.queue) if self.queue else 0)
-                progress = (_max - (self.getNoRunningThreads() + q))
-                pbar.update(progress)
-            cb = updateProgressBar
-            cb()
+                nrt = self.numRunningThreads
+                progress = (_max - (nrt + q))
+                state = "[Spool: Q: {q:2}, R: {nrt:2}/{quota}]".format(quota=self.quota, **locals())
+                progbar.update(progress, state=state)
+            cb = updateProgrssBar
 
         # assert not self.spoolThread.isAlive, "Background loop did not terminate"
         # Create a spoolloop, but block until it deploys all threads.
-        while (self.queue and len(self.queue) > 0) or (self.getNoRunningThreads() > 0):
+        execif(cb)
+        while (self.queue and len(self.queue) > 0) or (self.numRunningThreads > 0):
             self.dirty.wait()
             self.doSpool(verbose=verbose)        
             self.dirty.clear()
-            if cb:
-                cb()
+            execif(cb)
 
         assert len(self.queue) == 0, "Finished without deploying all threads"
-        assert self.getNoRunningThreads() == 0, "Finished without finishing all threads"
+        assert self.numRunningThreads == 0, "Finished without finishing all threads"
         
         if cb:
-            pbar.finish()
+            progbar.finish()
 
         if resume:
             self.queue.clear()  # Create a fresh queue
             self.start()
+
+        if verbose:
+            print(self)
 
     def flush(self):
         """Start and finishes all current threads before starting any new ones. 
@@ -190,6 +207,10 @@ class Spool():
             target(*args, **kwargs)
             self.dirty.set()
         self.queue.append(threading.Thread(target=runAndFlag, *thargs, **thkwargs))
+        self.dirty.set()
+
+    def setQuota(self, newQuota):
+        self.quota = newQuota
         self.dirty.set()
 
     def enqueueSeries(self, targets):
@@ -215,7 +236,8 @@ class Spool():
         newThread.start()
         self.dirty.set()
 
-    def getNoRunningThreads(self):
+    @property    
+    def numRunningThreads(self):
         """Accurately count number of "our" running threads.
         This prunes dead threads and returns a count of live threads.
         
@@ -256,7 +278,7 @@ class Spool():
 
         if self.flushing == 1:
             # Finish running threads
-            if self.getNoRunningThreads() == 0:
+            if self.numRunningThreads == 0:
                 self.flushing = 0
             else:
                 return
@@ -272,12 +294,12 @@ class Spool():
             #     return
 
         # Start threads until we've hit quota, or until we're out of threads.
-        while len(self.queue) > 0 and (self.getNoRunningThreads() < self.quota):
+        while len(self.queue) > 0 and (self.numRunningThreads < self.quota):
             self.startThread(self.queue.pop(0))
 
         if verbose:
             print(self.running_threads)
-            print("{} threads queued, {}/{} currently running.".format(len(self.queue), self.getNoRunningThreads(), self.quota))
+            print("{} threads queued, {}/{} currently running.".format(len(self.queue), self.numRunningThreads, self.quota))
 
 
 def test():
@@ -289,10 +311,10 @@ def test():
     work = []
 
     def dillydally(i, wait):
-        print("Job", i, "started.")
+        # print("Job", i, "started.")
         sleep(wait)
         work.append(i)
-        print("Job", i, "done.")
+        # print("Job", i, "done.")
 
     # with Spool(8, cpbar=True) as s:
     # Spool = FastSpool
@@ -305,36 +327,36 @@ def test():
         for i in range(0, 10):
             s.enqueue(target=dillydally, args=(i, 1))
 
-        sleep(4)
+        # sleep(4)
         print("Finish.")
         s.finish(use_pbar=True)
         print(work, len(work))
         assert len(work) == 10
 
-        work.clear()
-        s = Spool(2)
-        for i in range(0, 10):
-            s.enqueue(target=dillydally, args=(i, 1))
+        # work.clear()
+        # s = Spool(2)
+        # for i in range(0, 10):
+        #     s.enqueue(target=dillydally, args=(i, 1))
 
-        sleep(4)
-        print("Quiet Finish.")
-        s.finish(use_pbar=False)
-        print(work, len(work))
+        # sleep(4)
+        # print("Quiet Finish.")
+        # s.finish(use_pbar=False)
+        # print(work, len(work))
 
-        work.clear()
-        s = Spool(2)
-        for i in range(0, 10):
-            s.enqueue(target=dillydally, args=(i, 1))
+        # work.clear()
+        # s = Spool(2)
+        # for i in range(0, 10):
+        #     s.enqueue(target=dillydally, args=(i, 1))
 
-        sleep(4)
-        print("Finish and resume.")
-        s.finish(use_pbar=True, resume=True)
-        for i in range(10, 20):
-            s.enqueue(target=dillydally, args=(i, 1))
-        sleep(12)
-        print("Finish.")
-        s.finish(use_pbar=True)
-        assert len(work) == 20
+        # sleep(4)
+        # print("Finish and resume.")
+        # s.finish(use_pbar=True, resume=True)
+        # for i in range(10, 20):
+        #     s.enqueue(target=dillydally, args=(i, 1))
+        # sleep(12)
+        # print("Finish.")
+        # s.finish(use_pbar=True)
+        # assert len(work) == 20
 
     def test_wrapper():
         print("Test wrapper.")
