@@ -9,8 +9,10 @@ import json
 # import pickle
 from os import makedirs, path
 import shutil   
+import traceback
 
-# Version 1.5
+
+# Version 1.6
 
 basepath_json = "./jobj/" 
 basepath_pick = "./obj/" 
@@ -43,13 +45,19 @@ def json_load(filename, basepath=basepath_json, default=None):
     Returns:
         Object
     """
+    json_path = get_json_path(basepath, filename)
     try:
-        with open(get_json_path(basepath, filename), 'r') as file:
+        with open(json_path, 'r') as file:
             return json.load(file)
-    except Exception as e:
+    except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
+        # raise
+        print("Error with file", json_path)
+        traceback.print_exc()
         if default is not None:
+            print("Load failed for file", filename, "; defaulting.")
             return default
         else:
+            print("Load failed for file", filename, "with no default provided")
             raise
 
 
@@ -61,8 +69,12 @@ def json_save(object, filepath, basepath=basepath_json):
     filepath = get_json_path(basepath, filepath)
     (fdirs, fname) = path.split(filepath)
     makedirs(fdirs, exist_ok=True)
+    if path.isfile(filepath):
+        shutil.move(filepath, filepath + ".bak")
     with open(filepath, 'w') as file:
+        print("Dumping", filepath)
         json.dump(object, file, indent=4)
+        print("Dumped", filepath)
 
 
 load = json_load
@@ -87,11 +99,6 @@ class Handler():
 
     def __exit__(self, type, value, traceback):
         if not self.readonly:
-            # print("Saving.")
-            # print("{} -> {}".format(
-            #     len(self.load().keys()),
-            #     len(self.obj.keys())
-            # ))
             save(self.obj, self.name, basepath=self.basepath)
 
     def flush(self):
@@ -102,15 +109,15 @@ class Handler():
 
 
 class RotatingHandler(Handler):
-    def __init__(self, name, default=None, basepath=basepath_json, readonly=False):
-        super(RotatingHandler, self).__init__(
-            name,
-            default=default, basepath=basepath, readonly=readonly
-        )
-
     def __enter__(self):
         try:
-            return super(RotatingHandler, self).__enter__()
+            self.obj = self.load()
+            # File is good, so:
+            shutil.copy2(
+                get_json_path(self.basepath, self.name),
+                get_json_path(self.basepath, self.name) + ".bak"
+            ) 
+            return self.obj
         except json.JSONDecodeError as e:
             print("Warning: data file '{}' corrupted. ".format(self.name))
             print("Deleting corrupted data")
@@ -120,11 +127,4 @@ class RotatingHandler(Handler):
                 get_json_path(self.basepath, self.name) + ".bak",
                 get_json_path(self.basepath, self.name)
             ) 
-            return super(RotatingHandler, self).__enter__()
-
-    def __exit__(self, type, value, traceback):
-        super(RotatingHandler, self).__exit__(type, value, traceback)
-        shutil.copy2(
-            get_json_path(self.basepath, self.name),
-            get_json_path(self.basepath, self.name) + ".bak"
-        ) 
+            super(RotatingHandler, self).__enter__()
