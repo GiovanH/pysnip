@@ -69,12 +69,13 @@ def json_save(object, filepath, basepath=basepath_json):
     filepath = get_json_path(basepath, filepath)
     (fdirs, fname) = path.split(filepath)
     makedirs(fdirs, exist_ok=True)
+
+    # Displace
     if path.isfile(filepath):
         shutil.move(filepath, filepath + ".bak")
+
     with open(filepath, 'w') as file:
-        print("Dumping", filepath)
         json.dump(object, file, indent=4)
-        print("Dumped", filepath)
 
 
 load = json_load
