@@ -188,6 +188,22 @@ def timestamp():
 # Data structures
 
 
+def chunk(it, size):
+    """A generator that yields lists of size `size` containing the results of iterable `it`.
+    
+    Args:
+        it (iterable): An iterable to split into chunks
+        size (int): Max size of chunks
+    
+    Yields:
+        lists
+    """
+    from itertools import islice
+    iter_it = iter(it)
+    for chunk in iter(lambda: tuple(islice(iter_it, size)), ()):
+        yield chunk
+
+
 def flatList(lst):
     """Summary
     
