@@ -100,12 +100,13 @@ class Handler():
 
     def __exit__(self, type, value, traceback):
         if not self.readonly:
-            save(self.obj, self.name, basepath=self.basepath)
+            self.flush()
 
     def flush(self):
         if self.readonly:
             raise NotImplemented("Cannot save if readonly is True.")
         else:
+            print("Flushing", self.name)
             save(self.obj, self.name, basepath=self.basepath)
 
 
@@ -114,10 +115,7 @@ class RotatingHandler(Handler):
         try:
             self.obj = self.load()
             # File is good, so:
-            shutil.copy2(
-                get_json_path(self.basepath, self.name),
-                get_json_path(self.basepath, self.name) + ".bak"
-            ) 
+            self.backup()
             return self.obj
         except json.JSONDecodeError as e:
             print("Warning: data file '{}' corrupted. ".format(self.name))
@@ -129,3 +127,14 @@ class RotatingHandler(Handler):
                 get_json_path(self.basepath, self.name)
             ) 
             super(RotatingHandler, self).__enter__()
+
+    def backup(self):
+        print("Backing up", self.name)
+        shutil.copy2(
+            get_json_path(self.basepath, self.name),
+            get_json_path(self.basepath, self.name) + ".bak"
+        ) 
+
+    def flush(self):
+        super().flush()
+        # self.backup()
