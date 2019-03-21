@@ -111,29 +111,40 @@ class Handler():
 
 
 class RotatingHandler(Handler):
-    def __enter__(self):
+    def load(self):
         try:
-            self.obj = self.load()
+            self.obj = load(self.name, basepath=self.basepath)  # Don't handle failure; no default
             # File is good, so:
             self.backup()
             return self.obj
-        except json.JSONDecodeError as e:
+        except (json.JSONDecodeError, FileNotFoundError) as e:
             print("Warning: data file '{}' corrupted. ".format(self.name))
-            print("Deleting corrupted data")
-            shutil.os.remove(self.name)
-            print("Restoring backup")
-            shutil.copy2(
-                get_json_path(self.basepath, self.name) + ".bak",
-                get_json_path(self.basepath, self.name)
-            ) 
-            super(RotatingHandler, self).__enter__()
+            if shutil.os.path.isfile(get_json_path(self.basepath, self.name)):
+                # If the file exists, but is corrupted
+                print("Deleting corrupted data")
+                shutil.os.remove(get_json_path(self.basepath, self.name))
+            if path.exists(get_json_path(self.basepath, self.name) + ".bak"):
+                # If backup exists
+                print("Restoring backup")
+                shutil.copy2(
+                    get_json_path(self.basepath, self.name) + ".bak",
+                    get_json_path(self.basepath, self.name)
+                ) 
+                self.obj = load(self.name, basepath=self.basepath)
+                return self.obj
+            elif self.default:
+                self.obj = load(self.name, basepath=self.basepath, default=self.default)
+                return self.obj
+            else:
+                raise
 
     def backup(self):
-        print("Backing up", self.name)
-        shutil.copy2(
-            get_json_path(self.basepath, self.name),
-            get_json_path(self.basepath, self.name) + ".bak"
-        ) 
+        # print("Backing up", self.name)
+        if path.exists(get_json_path(self.basepath, self.name)):
+            shutil.copy2(
+                get_json_path(self.basepath, self.name),
+                get_json_path(self.basepath, self.name) + ".bak"
+            ) 
 
     def flush(self):
         super().flush()
