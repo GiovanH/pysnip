@@ -1,7 +1,5 @@
 from contextlib import contextmanager
 from string import Formatter
-import datetime
-
 # Flow control
 
 
@@ -43,6 +41,9 @@ def slow(iterable, delay):
 
 
 # Math
+
+
+# User prompts
 
 
 # Streams
@@ -182,6 +183,8 @@ def timestamp():
     Returns:
         str: Timestamp
     """
+    import datetime
+
     return datetime.datetime.now().strftime("%Y-%m-%d %I:%M%p")
 
 
@@ -308,155 +311,20 @@ class AttrDump():
 
 # File handling
 
-def copyFileToDir(source, destination, clobber=False, print=False):
-    """Copies file `source` to folder `destination`.
-    
-    Args:
-        source (str): Source path
-        destination (str): Destination path
-        clobber (bool, optional): Error instead of overwriting existing files.
-        print (bool, optional): Print progress to screen
-    
-    Returns:
-        str: Destination path
-    """
-    import shutil
-    return opFileToDir(shutil.copy2, source, destination, clobber, print)
-
-
-def copyFileToFile(source, destination, clobber=False, print=False):
-    """Copies file `source` to file `destination`.
-    
-    Args:
-        source (str): Source path
-        destination (str): Destination path
-        clobber (bool, optional): Error instead of overwriting existing files.
-        print (bool, optional): Print progress to screen
-    
-    Returns:
-        str: Destination path
-    """
-    import shutil
-    return opFileToFile(shutil.copy2, source, destination, clobber, print)
-
-
-def copyDirToParent(source, destination, clobber=False, print=False):
-    """Copies directory `source` to `destination`. `source` will become a subfolder of `destination`.
-    
-    Args:
-        source (str): Source path
-        destination (str): Destination path
-        clobber (bool, optional): Error instead of overwriting existing files.
-        print (bool, optional): Print progress to screen
-    
-    Returns:
-        str: Destination path
-    """
-    import shutil
-    return opDirToParent(shutil.copy2, source, destination, clobber, print)
-
-
-def copyDirWithMerge(source, destination, clobber=False, print=False):
-    """Copies directory `source` to `destination`. If `destination` is a directory, the two are merged.
-    
-    Args:
-        source (str): Source path
-        destination (str): Destination path
-        clobber (bool, optional): Error instead of overwriting existing files.
-        print (bool, optional): Print progress to screen
-    
-    Returns:
-        list: Destination paths
-    """
-    from distutils.dir_util import copy_tree
-    return opDirWithMerge(copy_tree, source, destination, clobber, print)
-
-
-def _copyTreeAndRemove(source, destination):
-    """Summary
-    
-    Args:
-        source (TYPE): Description
-        destination (TYPE): Description
-    """
-    from distutils.dir_util import copy_tree
+def userProfile(subdir=""):
     import os
-    result = copy_tree(source, destination)
-    os.unlink(source)
-    return result
+    user_profile = os.environ.get("userprofile") or os.path.expanduser("~")
+    return os.path.join(user_profile, subdir)
 
 
-def moveFileToDir(source, destination, clobber=False, verbose=True):
-    """Moves file `source` to folder `destination`.
-    
-    Args:
-        source (str): Source path
-        destination (str): Destination path
-        clobber (bool, optional): Error instead of overwriting existing files.
-        verbose (bool, optional): Print progress to screen
-    
-    Returns:
-        str: Destination path
-    """
-    import shutil
-    return opFileToDir(shutil.move, source, destination, clobber, verbose)
-
-
-def moveFileToFile(source, destination, clobber=False, verbose=True):
-    """Moves file `source` to file `destination`.
-    
-    Args:
-        source (str): Source path
-        destination (str): Destination path
-        clobber (bool, optional): Error instead of overwriting existing files.
-        verbose (bool, optional): Print progress to screen
-    
-    Returns:
-        str: Destination path
-    """
-    import shutil
-    return opFileToFile(shutil.move, source, destination, clobber, verbose)
-
-
-def moveDirToParent(source, destination, clobber=False, verbose=True):
-    """Moves directory `source` to `destination`. `source` will become a subfolder of `destination`.
-    
-    Args:
-        source (str): Source path
-        destination (str): Destination path
-        clobber (bool, optional): Error instead of overwriting existing files.
-        verbose (bool, optional): Print progress to screen
-    
-    Returns:
-        str: Destination path
-    """
-    import shutil
-    return opDirToParent(shutil.move, source, destination, clobber, verbose)
-
-
-def moveDirWithMerge(source, destination, clobber=False, verbose=True):
-    """Moves directory `source` to `destination`. If `destination` is a directory, the two are merged.
-    
-    Args:
-        source (str): Source path
-        destination (str): Destination path
-        clobber (bool, optional): Error instead of overwriting existing files.
-        verbose (bool, optional): Print progress to screen
-    
-    Returns:
-        list: Destination paths
-    """
-    return opDirWithMerge(_copyTreeAndRemove, source, destination, clobber, verbose)
-
-
-def renameFileOnly(source, destination, clobber=False, verbose=True, preserve_extension=True):
+def renameFileOnly(source, destination, clobber=False, quiet=False, preserve_extension=True):
     """Renames file `source` to file `destination`.
     
     Args:
         source (str): Source path
         destination (str): Destination FILENAME
         clobber (bool, optional): Error instead of overwriting existing files.
-        verbose (bool, optional): Print progress to screen
+        quiet (bool, optional): Print progress to screen
     
     Returns:
         str: Destination path
@@ -472,44 +340,46 @@ def renameFileOnly(source, destination, clobber=False, verbose=True, preserve_ex
         old_name_base, old_ext = path.splitext(old_name)
         new_name_base, new_ext = path.splitext(new_name)
 
-        assert (new_ext == "" or new_ext == old_ext), "New name should not have a new extension while preserve_extension is True!"
+        if not (new_ext == "" or new_ext == old_ext):
+            print("WARNING: New name should not have a new extension while preserve_extension is True!")
 
-        new_name = new_name_base + old_ext
+        new_name = new_name_base + new_ext + old_ext
 
     real_destination = path.join(old_dir, new_name)
-    return opFileToFile(shutil.move, source, real_destination, clobber, verbose)
+    return opFileToFile(shutil.move, source, real_destination, clobber, quiet)
 
 
-def opFileToDir(op, source, destination, clobber, verbose):
+def opFileToDir(op, source, destination, clobber, quiet):
     from os import path
     if not clobber:
         (srcdir, srcfile) = path.split(source)
-        new_file_name = path.join(destination, source)
+        new_file_name = path.join(destination, srcfile)
         nfiles = [new_file_name]
     else:
         nfiles = []
     yfiles = [source]
     yfolders = [destination]
     _safetyChecks(yfiles=yfiles, yfolders=yfolders, nfiles=nfiles)
-    return _doFileOp(op, source, destination, verbose)
+    return _doFileOp(op, source, destination, quiet)
 
 
-def opFileToFile(op, source, destination, clobber, verbose):
+def opFileToFile(op, source, destination, clobber, quiet):
+    assert source != destination, "Paths are the same! " + source
     nfiles = [destination] if not clobber else []
     yfiles = [source]
     _safetyChecks(yfiles=yfiles, nfiles=nfiles)
-    return _doFileOp(op, source, destination, verbose)
+    return _doFileOp(op, source, destination, quiet)
 
 
-def opDirToParent(op, source, destination, clobber, verbose):
+def opDirToParent(op, source, destination, clobber, quiet):
     _safetyChecks(yfolders=[source, destination])
-    return _doFileOp(op, source, destination, verbose)
+    return _doFileOp(op, source, destination, quiet)
 
 
-def opDirWithMerge(op, source, destination, clobber, verbose):
+def opDirWithMerge(op, source, destination, clobber, quiet):
     nfolders = [destination] if not clobber else []
     _safetyChecks(yfolders=[source], nfolders=nfolders)
-    return _doFileOp(op, source, destination, verbose)
+    return _doFileOp(op, source, destination, quiet)
 
 
 def _safetyChecks(yfiles=[], yfolders=[], nfiles=[], nfolders=[]):
@@ -528,16 +398,157 @@ def _safetyChecks(yfiles=[], yfolders=[], nfiles=[], nfolders=[]):
             raise FileExistsError(folder)
 
 
-def _doFileOp(op, source, destination, verbose):
+def _doFileOp(op, source, destination, quiet):
     try:
         result = op(source, destination)
-        if verbose:
+        if not quiet:
             print("{} --> {}".format(source, destination))
         return result
     except Exception as e:
-        if verbose:
+        if not quiet:
             print("{} -x> {}".format(source, destination))
         raise
+
+
+def copyFileToDir(source, destination, clobber=False, quiet=False):
+    """Copies file `source` to folder `destination`.
+    
+    Args:
+        source (str): Source path
+        destination (str): Destination path
+        clobber (bool, optional): Error instead of overwriting existing files.
+        print (bool, optional): Print progress to screen
+    
+    Returns:
+        str: Destination path
+    """
+    import shutil
+    return opFileToDir(shutil.copy2, source, destination, clobber, quiet)
+
+
+def copyFileToFile(source, destination, clobber=False, quiet=False):
+    """Copies file `source` to file `destination`.
+    
+    Args:
+        source (str): Source path
+        destination (str): Destination path
+        clobber (bool, optional): Error instead of overwriting existing files.
+        print (bool, optional): Print progress to screen
+    
+    Returns:
+        str: Destination path
+    """
+    import shutil
+    return opFileToFile(shutil.copy2, source, destination, clobber, quiet)
+
+
+def copyDirToParent(source, destination, clobber=False, quiet=False):
+    """Copies directory `source` to `destination`. `source` will become a subfolder of `destination`.
+    
+    Args:
+        source (str): Source path
+        destination (str): Destination path
+        clobber (bool, optional): Error instead of overwriting existing files.
+        print (bool, optional): Print progress to screen
+    
+    Returns:
+        str: Destination path
+    """
+    import shutil
+    return opDirToParent(shutil.copy2, source, destination, clobber, quiet)
+
+
+def copyDirWithMerge(source, destination, clobber=False, quiet=False):
+    """Copies directory `source` to `destination`. If `destination` is a directory, the two are merged.
+    
+    Args:
+        source (str): Source path
+        destination (str): Destination path
+        clobber (bool, optional): Error instead of overwriting existing files.
+        print (bool, optional): Print progress to screen
+    
+    Returns:
+        list: Destination paths
+    """
+    from distutils.dir_util import copy_tree
+    return opDirWithMerge(copy_tree, source, destination, clobber, quiet)
+
+
+def _copyTreeAndRemove(source, destination):
+    """Summary
+    
+    Args:
+        source (TYPE): Description
+        destination (TYPE): Description
+    """
+    from distutils.dir_util import copy_tree
+    import os
+    result = copy_tree(source, destination)
+    os.unlink(source)
+    return result
+
+
+def moveFileToDir(source, destination, clobber=False, quiet=False):
+    """Moves file `source` to folder `destination`.
+    
+    Args:
+        source (str): Source path
+        destination (str): Destination path
+        clobber (bool, optional): Error instead of overwriting existing files.
+        quiet (bool, optional): Print progress to screen
+    
+    Returns:
+        str: Destination path
+    """
+    import shutil
+    return opFileToDir(shutil.move, source, destination, clobber, quiet)
+
+
+def moveFileToFile(source, destination, clobber=False, quiet=False):
+    """Moves file `source` to file `destination`.
+    
+    Args:
+        source (str): Source path
+        destination (str): Destination path
+        clobber (bool, optional): Error instead of overwriting existing files.
+        quiet (bool, optional): Print progress to screen
+    
+    Returns:
+        str: Destination path
+    """
+    import shutil
+    return opFileToFile(shutil.move, source, destination, clobber, quiet)
+
+
+def moveDirToParent(source, destination, clobber=False, quiet=False):
+    """Moves directory `source` to `destination`. `source` will become a subfolder of `destination`.
+    
+    Args:
+        source (str): Source path
+        destination (str): Destination path
+        clobber (bool, optional): Error instead of overwriting existing files.
+        quiet (bool, optional): Print progress to screen
+    
+    Returns:
+        str: Destination path
+    """
+    import shutil
+    return opDirToParent(shutil.move, source, destination, clobber, quiet)
+
+
+def moveDirWithMerge(source, destination, clobber=False, quiet=False):
+    """Moves directory `source` to `destination`. If `destination` is a directory, the two are merged.
+    
+    Args:
+        source (str): Source path
+        destination (str): Destination path
+        clobber (bool, optional): Error instead of overwriting existing files.
+        quiet (bool, optional): Print progress to screen
+    
+    Returns:
+        list: Destination paths
+    """
+    return opDirWithMerge(_copyTreeAndRemove, source, destination, clobber, quiet)
 
 
 # Hashing
