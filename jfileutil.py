@@ -54,10 +54,10 @@ def json_load(filename, basepath=basepath_json, default=None):
         print("Error with file", json_path)
         traceback.print_exc()
         if default is not None:
-            print("Load failed for file", filename, "; defaulting.")
+            # print("Load failed for file", filename, "; defaulting.")
             return default
         else:
-            print("Load failed for file", filename, "with no default provided")
+            # print("Load failed for file", filename, "with no default provided")
             raise
 
 
@@ -106,7 +106,7 @@ class Handler():
         if self.readonly:
             raise NotImplemented("Cannot save if readonly is True.")
         else:
-            print("Flushing", self.name)
+            # print("Flushing", self.name)
             save(self.obj, self.name, basepath=self.basepath)
 
 
