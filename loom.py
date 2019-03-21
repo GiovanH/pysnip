@@ -146,7 +146,7 @@ class Spool():
         _max = self.numRunningThreads + len(self.queue)
         if use_pbar and _max > 0:
             widgets = [
-                ("[{n}] ".format(n=self.name) if self.name else ' '), progressbar.Percentage(),
+                ("[{n}] ".format(n=self.name) if self.name else ''), progressbar.Percentage(),
                 ' ', progressbar.SimpleProgress(format='%(value_s)s of %(max_value_s)s'),
                 ' ', progressbar.Bar(),
                 ' ', DynamicProgressString(name="state"),
