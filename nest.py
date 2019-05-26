@@ -13,25 +13,17 @@ class Nest():
         identifier (str): The name of the JSON file backing the dict
     """
     
-    def __init__(self, identifier, default=None, load=None):
+    def __init__(self, load=None):
         """Args:
             identifier (str): The name of the JSON file backing the dict
             default (dict, optional): Use this dictionary if file errors
             load (dict, optional): Load this dictionary and replace the file
         """
         super(Nest, self).__init__()
-        self.identifier = identifier
         if load is None:
-            try:
-                self.reload()
-            except (FileNotFoundError, JSONDecodeError) as e:
-                if default is None:
-                    raise
-                else:
-                    self.dictionary = default
+            self.dictionary = dict()
         else:
             self.dictionary = load
-            self.flush()
 
     def keys(self, root=None):
         if not root:
@@ -86,7 +78,6 @@ class Nest():
                 root = root[nextkey]
         nextkey = keystack.pop(0)
         root[nextkey] = value
-        self.flush()
 
     def flatten(self, key="", root=None, trees=False, leaves=True):
         """Returns a flat list 
@@ -113,6 +104,33 @@ class Nest():
                         yield t
             else:
                 yield(nextkey, root[subkey])
+
+
+class FsNest(Nest):
+
+    def __init__(self, identifier, default=None, load=None):
+        """Args:
+            identifier (str): The name of the JSON file backing the dict
+            default (dict, optional): Use this dictionary if file errors
+            load (dict, optional): Load this dictionary and replace the file
+        """
+        super(Nest, self).__init__()
+        self.identifier = identifier
+        if load is None:
+            try:
+                self.reload()
+            except (FileNotFoundError, JSONDecodeError) as e:
+                if default is None:
+                    raise
+                else:
+                    self.dictionary = default
+        else:
+            self.dictionary = load
+            self.flush()
+
+    def set(self, key, value):
+        super().set(key, value)
+        self.flush()
 
     def reload(self):
         """Load json from file
