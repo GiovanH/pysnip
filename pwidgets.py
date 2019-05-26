@@ -10,4 +10,4 @@ class DynamicProgressString(progressbar.DynamicMessage):
             assert isinstance(val, str)
             return val
         else:
-            return "[" + self.name + "]"
+            return "[(" + self.name + ")]"
