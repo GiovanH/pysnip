@@ -357,6 +357,19 @@ class AttrDump():
     pass
 
 
+def crawlApi(value, mykey="Root", indent=0):
+    if isinstance(value, dict):
+        print(" " * indent * 4, mykey, "[{}]".format(type(value)), "...")
+        for key in value.keys():
+            crawlApi(value[key], key, indent + 1)
+    elif isinstance(value, list):
+        print(" " * indent * 4, mykey, "[{}]".format(type(value)), "...")
+        if len(value) > 0:
+            crawlApi(value[0], mykey, indent + 1)
+    else:
+        print(" " * indent * 4, mykey, "[{}]".format(type(value)), repr(value)[:128])
+
+
 # File handling
 
 def userProfile(subdir=""):
