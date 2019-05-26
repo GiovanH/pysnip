@@ -98,6 +98,7 @@ class Spool():
         self.running_threads = []
 
         self.flushing = 0
+        self._pbar_max = 0
         self.spoolThread = None
         self.background_spool = False
         self.dirty = threading.Event()
@@ -143,8 +144,8 @@ class Spool():
             print(self)
 
         # Progress bar management, optional.
-        _max = self.numRunningThreads + len(self.queue)
-        if use_pbar and _max > 0:
+        self._pbar_max = self.numRunningThreads + len(self.queue)
+        if use_pbar and self._pbar_max > 0:
             widgets = [
                 ("[{n}] ".format(n=self.name) if self.name else ''), progressbar.Percentage(),
                 ' ', progressbar.SimpleProgress(format='%(value_s)s of %(max_value_s)s'),
@@ -153,14 +154,15 @@ class Spool():
                 ' ', progressbar.Timer(),
                 ' ', progressbar.AdaptiveETA(),
             ]
-            progbar = progressbar.ProgressBar(max_value=_max, widgets=widgets, redirect_stdout=True)
+            self.progbar = progbar = progressbar.ProgressBar(max_value=self._pbar_max, widgets=widgets, redirect_stdout=True)
 
             def updateProgrssBar():
                 # Update progress bar.
                 q = (len(self.queue) if self.queue else 0)
                 nrt = self.numRunningThreads
-                progress = (_max - (nrt + q))
+                progress = (self._pbar_max - (nrt + q))
                 state = "[Spool: Q: {q:2}, R: {nrt:2}/{quota}]".format(quota=self.quota, **locals())
+                progbar.max_value = self._pbar_max
                 progbar.update(progress, state=state)
             cb = updateProgrssBar
 
@@ -207,6 +209,7 @@ class Spool():
             target(*args, **kwargs)
             self.dirty.set()
         self.queue.append(threading.Thread(target=runAndFlag, *thargs, **thkwargs))
+        self._pbar_max += 1
         self.dirty.set()
 
     def setQuota(self, newQuota):
@@ -391,6 +394,24 @@ def test():
         print(work, len(work))
         assert len(work) == 10
 
+
+    def test_morework():
+        work.clear()
+
+        def nestedWork(sp):
+            work.append("x")
+            if sp:
+                sp.enqueue(nestedWork, (None,))
+                sp.enqueue(nestedWork, (None,))
+
+        with Spool(4) as s:
+            s.enqueue(nestedWork, (s,))
+            s.enqueue(nestedWork, (s,))
+
+        print(work, len(work))
+
+        
+
     def test_midflush():
         print("Test mid-work flush.")
         work.clear()
@@ -412,7 +433,8 @@ def test():
         print(work, len(work))
         assert len(work) == 8
 
-    test_simple_finish()
+    #    test_simple_finish()
+    test_morework()
     # test_wrapper()
     # test_midflush()
 

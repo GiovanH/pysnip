@@ -132,7 +132,7 @@ class RotatingHandler(Handler):
                 ) 
                 self.obj = load(self.name, basepath=self.basepath)
                 return self.obj
-            elif self.default:
+            elif self.default is not None:
                 self.obj = load(self.name, basepath=self.basepath, default=self.default)
                 return self.obj
             else:
@@ -146,6 +146,6 @@ class RotatingHandler(Handler):
                 get_json_path(self.basepath, self.name) + ".bak"
             ) 
 
-    def flush(self):
-        super().flush()
+    # def flush(self):
+    #     super().flush()
         # self.backup()
