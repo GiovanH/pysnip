@@ -9,7 +9,7 @@ import json
 # import pickle
 from os import makedirs, path
 import shutil   
-import traceback
+# import traceback
 
 
 # Version 1.6
@@ -52,7 +52,7 @@ def json_load(filename, basepath=basepath_json, default=None):
     except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
         # raise
         print("Error with file", json_path)
-        traceback.print_exc()
+        # traceback.print_exc()
         if default is not None:
             # print("Load failed for file", filename, "; defaulting.")
             return default
