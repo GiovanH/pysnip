@@ -42,8 +42,16 @@ def slow(iterable, delay):
 
 # Math
 
+@contextmanager
+def timer():
+    import time
+    start_time = time.time()
 
-# User prompts
+    try:
+        yield None
+    finally:
+        time_taken = time.time() - start_time
+        print(time_taken)
 
 
 # Streams
