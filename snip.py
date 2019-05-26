@@ -372,6 +372,16 @@ def crawlApi(value, mykey="Root", indent=0):
 
 # File handling
 
+def easySlug(string, repl="-", directory=False):
+    import re
+    if directory:
+        return re.sub("^\.|\.$", "", easySlug(string, directory=False))
+    else:
+        return re.sub("[\\\\/:*?\"<>\|]", repl, string)
+
+    #
+
+
 def userProfile(subdir=""):
     import os
     user_profile = os.environ.get("userprofile") or os.path.expanduser("~")
