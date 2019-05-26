@@ -6,9 +6,9 @@ from string import Formatter
 def execif(function, args=tuple(), kwargs=dict(), condition=lambda f=None: bool(f)):
     """Shorthand. Executes a function with given args and kwargs if condition coerces to True.
     condition is a function of f, where f is the name of the function itself.
-    
+
     This allows, amung other things, for function names to be set to None to disable them.
-    
+
     Args:
         function (TYPE): Description
         args (TYPE, optional): Description
@@ -25,11 +25,11 @@ def execif(function, args=tuple(), kwargs=dict(), condition=lambda f=None: bool(
 def slow(iterable, delay):
     """A generator that simply throttles another generator or iterable.
     Note that this only throttles the generator, and may become invisible for slow functions.
-    
+
     Args:
         iterable: Any generator or iterable that supports `for`
         delay (int): Number of seconds between cycles.
-    
+
     Yields:
         next: type(next(iterable))
     """
@@ -48,21 +48,22 @@ def slow(iterable, delay):
 
 # Streams
 
+
 class ContextPrinter():
 
     """Similar to a logger. Wraps print with the statements file name and context.
     """
-    
+
     def __init__(self, vars_, width=10, timestamp=True):
         """Context
-        
+
         Args:
             vars_ (vars()): Initialize with the vars() call
             width (int, optional): Width of text box
             timestamp (bool, optional): Whether to display a time stamp or not
-        
+
         """
-        
+
         from builtins import print as bprint
         self.print = bprint
         self.timestamp = timestamp
@@ -80,14 +81,14 @@ class ContextPrinter():
 class DefaultFormatter(Formatter):
 
     """Summary
-    
+
     Attributes:
         defaults (TYPE): Description
     """
-    
+
     def __init__(self, **kwargs):
         """Summary
-        
+
         Args:
             **kwargs: Description
         """
@@ -96,12 +97,12 @@ class DefaultFormatter(Formatter):
 
     def get_value(self, key, args, kwargs):
         """Summary
-        
+
         Args:
             key (TYPE): Description
             args (TYPE): Description
             kwargs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -153,10 +154,10 @@ def std_redirected(filename, errname=None):
 
 def numSplit(string):
     """Summary
-    
+
     Args:
         string (TYPE): Description
-    
+
     Returns:
         TYPE: Description
     """
@@ -179,7 +180,7 @@ def numSplit(string):
 def timestamp():
     """Just give a human-readable timestamp.
     Format is %Y-%m-%d %I:%M%p, i.e. "2018-01-02 9:12 PM"
-    
+
     Returns:
         str: Timestamp
     """
@@ -193,11 +194,11 @@ def timestamp():
 
 def chunk(it, size):
     """A generator that yields lists of size `size` containing the results of iterable `it`.
-    
+
     Args:
         it (iterable): An iterable to split into chunks
         size (int): Max size of chunks
-    
+
     Yields:
         lists
     """
@@ -209,10 +210,10 @@ def chunk(it, size):
 
 def flatList(lst):
     """Summary
-    
+
     Args:
         lst (TYPE): Description
-    
+
     Returns:
         TYPE: Description
     """
@@ -226,7 +227,7 @@ class Listionary(dict):
 
     def __setitem__(self, key, value):
         """Summary
-        
+
         Args:
             key (TYPE): Description
             value (TYPE): Description
@@ -240,14 +241,14 @@ class Listionary(dict):
 
     def append(self, key, value, create_needed=True):
         """Append a value to a key's list.
-        
+
         Args:
             key (TYPE): Description
             value (TYPE): Description
             create_needed (bool, optional): If no list exists, create a new one.
             key
             value
-        
+
         Returns:
             List: this[key]
         """
@@ -259,13 +260,13 @@ class Listionary(dict):
 
     def remove(self, key, value):
         """Remove a value from a key's list. 
-        
+
         ```self[key].remove(value)
            return self[key]```
-        
+
         Returns:
             List: this[key]
-        
+
         Args:
             key (TYPE): Description
             value (TYPE): Description
@@ -298,12 +299,12 @@ class Dummy():
 
 class AttrDump():
     """Holds arbitrary attributes. Example:
-    
+
     a = AttrDump
     a.fish = "fish"
     a.fish
     > "fish"
-    
+
     "Okay, so obviously THIS one is useless, right?"
     """
     pass
@@ -319,13 +320,13 @@ def userProfile(subdir=""):
 
 def renameFileOnly(source, destination, clobber=False, quiet=False, preserve_extension=True):
     """Renames file `source` to file `destination`.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination FILENAME
         clobber (bool, optional): Error instead of overwriting existing files.
         quiet (bool, optional): Print progress to screen
-    
+
     Returns:
         str: Destination path
     """
@@ -412,13 +413,13 @@ def _doFileOp(op, source, destination, quiet):
 
 def copyFileToDir(source, destination, clobber=False, quiet=False):
     """Copies file `source` to folder `destination`.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination path
         clobber (bool, optional): Error instead of overwriting existing files.
         print (bool, optional): Print progress to screen
-    
+
     Returns:
         str: Destination path
     """
@@ -428,13 +429,13 @@ def copyFileToDir(source, destination, clobber=False, quiet=False):
 
 def copyFileToFile(source, destination, clobber=False, quiet=False):
     """Copies file `source` to file `destination`.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination path
         clobber (bool, optional): Error instead of overwriting existing files.
         print (bool, optional): Print progress to screen
-    
+
     Returns:
         str: Destination path
     """
@@ -444,13 +445,13 @@ def copyFileToFile(source, destination, clobber=False, quiet=False):
 
 def copyDirToParent(source, destination, clobber=False, quiet=False):
     """Copies directory `source` to `destination`. `source` will become a subfolder of `destination`.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination path
         clobber (bool, optional): Error instead of overwriting existing files.
         print (bool, optional): Print progress to screen
-    
+
     Returns:
         str: Destination path
     """
@@ -460,13 +461,13 @@ def copyDirToParent(source, destination, clobber=False, quiet=False):
 
 def copyDirWithMerge(source, destination, clobber=False, quiet=False):
     """Copies directory `source` to `destination`. If `destination` is a directory, the two are merged.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination path
         clobber (bool, optional): Error instead of overwriting existing files.
         print (bool, optional): Print progress to screen
-    
+
     Returns:
         list: Destination paths
     """
@@ -476,7 +477,7 @@ def copyDirWithMerge(source, destination, clobber=False, quiet=False):
 
 def _copyTreeAndRemove(source, destination):
     """Summary
-    
+
     Args:
         source (TYPE): Description
         destination (TYPE): Description
@@ -490,13 +491,13 @@ def _copyTreeAndRemove(source, destination):
 
 def moveFileToDir(source, destination, clobber=False, quiet=False):
     """Moves file `source` to folder `destination`.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination path
         clobber (bool, optional): Error instead of overwriting existing files.
         quiet (bool, optional): Print progress to screen
-    
+
     Returns:
         str: Destination path
     """
@@ -506,13 +507,13 @@ def moveFileToDir(source, destination, clobber=False, quiet=False):
 
 def moveFileToFile(source, destination, clobber=False, quiet=False):
     """Moves file `source` to file `destination`.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination path
         clobber (bool, optional): Error instead of overwriting existing files.
         quiet (bool, optional): Print progress to screen
-    
+
     Returns:
         str: Destination path
     """
@@ -522,13 +523,13 @@ def moveFileToFile(source, destination, clobber=False, quiet=False):
 
 def moveDirToParent(source, destination, clobber=False, quiet=False):
     """Moves directory `source` to `destination`. `source` will become a subfolder of `destination`.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination path
         clobber (bool, optional): Error instead of overwriting existing files.
         quiet (bool, optional): Print progress to screen
-    
+
     Returns:
         str: Destination path
     """
@@ -538,13 +539,13 @@ def moveDirToParent(source, destination, clobber=False, quiet=False):
 
 def moveDirWithMerge(source, destination, clobber=False, quiet=False):
     """Moves directory `source` to `destination`. If `destination` is a directory, the two are merged.
-    
+
     Args:
         source (str): Source path
         destination (str): Destination path
         clobber (bool, optional): Error instead of overwriting existing files.
         quiet (bool, optional): Print progress to screen
-    
+
     Returns:
         list: Destination paths
     """
@@ -556,10 +557,10 @@ def moveDirWithMerge(source, destination, clobber=False, quiet=False):
 
 def md5(path):
     """Returns the md5 hash of the file at (str) path.
-    
+
     Args:
         path (str): Path to file
-    
+
     Returns:
         str: Hex digest of md5 hash
     """
@@ -573,13 +574,13 @@ def md5(path):
 
 def CRC32(filename):
     """Returns the CRC32 "hash" of the file at (str) path.
-    
+
     Args:
         filename (str): Path to file
-    
+
     Returns:
         str: Formated CRC32, as {:08X} formatted.
-    
+
     """
     from binascii import crc32
     buf = open(filename, 'rb').read()
