@@ -1,9 +1,8 @@
 """
-py_pkg
+Snip
 ~~~~~~
 
-The py_pkg package - a Python package template project that is intended
-to be used as a cookie-cutter for developing new Python packages.
+Snip: A library of generic helper functions for utility programs.
 """
 
 from . import data, filesystem, flow, hash, stream, string 
