@@ -37,3 +37,22 @@ def slow(iterable, delay):
         yield next
         sleep(max(0, (delay - (time() - last))))
 
+
+def elvisget(root, default, *chain):
+    _root = root
+    try:
+        for link in chain:
+            _root = _root.get(link)
+        return _root
+    except (AttributeError) as e:
+        return default
+
+
+def elvisattr(root, default, *chain):
+    _root = root
+    try:
+        for link in chain:
+            _root = _root.__getattribute__(link) or _root.__getattr__(link)
+        return _root
+    except (AttributeError) as e:
+        return default
