@@ -4,9 +4,9 @@
 def easySlug(string, repl="-", directory=False):
     import re
     if directory:
-        return re.sub("^\.|\.$", "", easySlug(string, directory=False))
+        return re.sub("^\.|\.+$", "", easySlug(string, directory=False))
     else:
-        return re.sub("[\\\\/:*?\"<>\|]", repl, string)
+        return re.sub("[\\\\/:*?\"<>\|]|\ $", repl, string)
 
     #
 
