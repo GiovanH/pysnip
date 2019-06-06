@@ -1,6 +1,6 @@
 """Summary
 """
-import jfileutil as ju
+from snip import jfileutil as ju
 from json.decoder import JSONDecodeError
 
 

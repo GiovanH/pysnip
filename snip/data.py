@@ -132,3 +132,12 @@ def crawlApi(value, mykey="Root", indent=0):
         print(" " * indent * 4, mykey, "[{}]".format(type(value)), repr(value)[:128])
 
 
+def writeJsonToCsv(data, filepath):
+    from . import nest
+
+    flat_entries = [dict(nest.Nest(entry).flatten()) for entry in data]
+    columns = sorted(set(flatList(entry.keys() for entry in flat_entries)))
+
+    with open(filepath, "w") as fp:
+        fp.write(",".join('"{}"'.format(column) for column in columns) + "\n")
+        fp.writelines(",".join('"{}"'.format(row.get(key)) for key in columns) + "\n" for row in flat_entries)
