@@ -24,7 +24,11 @@ class ContextPrinter():
         from builtins import print as bprint
         self.print = bprint
         self.timestamp = timestamp
-        self.context = "[{n:^{w}.{w}}]".format(w=width, n=vars_['__name__']).format()
+        self.context = "[{n:^{w}.{w}} {h}]".format(
+            w=width, 
+            n=vars_['__name__'], 
+            h=hash(vars_.get('__self__', 0)) % 1000
+        )
 
     def __call__(self, *args, **kwargs):
         if len(args) == 0:
