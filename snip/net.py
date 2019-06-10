@@ -1,8 +1,10 @@
-"""Summary
+"""Networking functions
 """
+
 from urllib.parse import urljoin
 import requests
 import bs4
+from .filesystem import easySlug
 
 
 def getSoup(url, prev_url=None):
@@ -58,7 +60,7 @@ def saveStreamAs(stream, dest_path):
     return True
 
 
-def saveStreamTo(stream, dest_directory, autoExt=True):
+def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug):
     """Saves a file from a URL to a directory.
     
     Args:
@@ -71,9 +73,8 @@ def saveStreamTo(stream, dest_directory, autoExt=True):
         bool: Success
     """
     from os import path
-    from .filesystem import easySlug
 
-    filename = easySlug(stream.url.split("/")[-1])
+    filename = slug(stream.url.split("/")[-1])
 
     if autoExt:
         filename_plain, ext = path.splitext(filename)
