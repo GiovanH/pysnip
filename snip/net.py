@@ -7,11 +7,11 @@ import bs4
 
 def getSoup(url, prev_url=None):
     """Get a BeautifulSoup object from a URL
-
+    
     Args:
-        url (str)
+        url (str): Remote URL
         prev_url (str, optional): Previous url, for relative resolution
-
+    
     Returns:
         soup: Beautiful Soup
     """
@@ -22,23 +22,34 @@ def getSoup(url, prev_url=None):
     return soup
 
 
-def saveAs(url, dest_path, prev_url=None, session=requests):
-    """Save a URL to a path as file
-
+def getStream(url, prev_url=None):
+    """Extremely light, dumb helper to get a stream from a url
+    
     Args:
-        url (str): Source URL
+        url (str): Remote URL
+        prev_url (str, optional): Previous url, for relative resolution
+    
+    Returns:
+        Requests stream
+    """
+    url = urljoin(prev_url, url)
+    stream = requests.get(url, stream=True)
+    return stream
+
+
+def saveStreamAs(stream, dest_path):
+    """Save a URL to a path as file
+    
+    Args:
+        stream (stream): Stream
         dest_path (str): Local path
-        prev_url (str, optional): Previous URL, for relative resolution
-        session (requests.Session, optional): Session for persistance
 
     Returns:
-        TYPE: Description
+        bool: Success
     """
     from os import path, stat
     from math import inf
-    url = urljoin(prev_url, url)
 
-    stream = session.get(url, stream=True)
     stream_length = stream.headers.get("Content-Length", inf)
     if path.isfile(dest_path) and stream_length == stat(dest_path).st_size:
         return False
@@ -47,43 +58,43 @@ def saveAs(url, dest_path, prev_url=None, session=requests):
     return True
 
 
-def saveTo(url, dest_directory, prev_url=None, session=requests, autoExt=True):
+def saveStreamTo(stream, dest_directory, autoExt=True):
     """Saves a file from a URL to a directory.
-
+    
     Args:
-        url (str): Remote URL to file
+        stream (TYPE): Description
         dest_directory (str): Local directory path
-        prev_url (str, optional): Previous URL for relative paths
-        session (requests.Session, optional): Session object for persistance
-
+        autoExt (bool, optional): Automatically append an extension 
+            based on the MIME type
+    
     Returns:
         bool: Success
     """
     from os import path
     from .filesystem import easySlug
 
-    filename = easySlug(url.split("/")[-1])
+    filename = easySlug(stream.url.split("/")[-1])
 
     if autoExt:
         filename_plain, ext = path.splitext(filename)
         if not ext:
             from ._data import mime2ext
             
-            content_type = session.get(url).headers.get("Content-Type")
+            content_type = stream.headers.get("Content-Type")
             ext_match = mime2ext.get(content_type.split(";")[0], "")
 
             filename = filename_plain + ext_match
 
     dest_path = path.join(dest_directory, filename)
-    return saveAs(url, dest_path, prev_url=prev_url, session=session)
+    return saveStreamAs(stream, dest_path)
 
 
 def _saveChunked(path, response):
     """Save a binary stream to a path. Dumb.
-
+    
     Args:
-        path (str)
-        response (response)
+        path (str): 
+        response (response): 
     """
     with open(path, 'wb') as file:
         for chunk in response:
