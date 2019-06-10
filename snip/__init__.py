@@ -9,6 +9,7 @@ from . import data, filesystem, flow, hash, stream, string
 from . import jfileutil, loom
 from . import prompt
 from . import nest
+from . import net
 
 import importlib
 
