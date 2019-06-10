@@ -36,6 +36,7 @@ def getStream(url, prev_url=None):
     """
     url = urljoin(prev_url, url)
     stream = requests.get(url, stream=True)
+    stream.raise_for_status()
     return stream
 
 
