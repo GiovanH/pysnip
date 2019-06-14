@@ -27,7 +27,7 @@ class ContextPrinter():
         self.context = "[{n:^{w}.{w}} {h}]".format(
             w=width, 
             n=vars_['__name__'], 
-            h=str(id(vars_))[0:4]
+            h=str(id(vars_))[-7:-1]
         )
 
     def __call__(self, *args, **kwargs):
