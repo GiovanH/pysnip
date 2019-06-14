@@ -9,14 +9,13 @@ from . import data, filesystem, flow, hash, stream, string
 from . import jfileutil, loom
 from . import prompt
 from . import nest
-from . import net
 
 import importlib
 
 modulesNotImported = []
 modulesNotFound = []
 
-for module in ["image", "audio", "tkit", "pwidgets"]:
+for module in ["image", "audio", "tkit", "pwidgets", "net"]:
     try:
         importlib.import_module("." + module, __name__)
     except ModuleNotFoundError as e:
