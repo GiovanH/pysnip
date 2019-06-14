@@ -8,8 +8,6 @@ def easySlug(string, repl="-", directory=False):
     else:
         return re.sub("[\\\\/:*?\"<>\|]|\ $", repl, string)
 
-    #
-
 
 def userProfile(subdir=""):
     import os

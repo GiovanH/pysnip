@@ -33,7 +33,10 @@ def loadBrowser():
         }
     }
 
-    browser = webdriver.Chrome(desired_capabilities=capabilities, executable_path=chromedriver_binary)
+    browser = webdriver.Chrome(
+        desired_capabilities=capabilities,
+        executable_path=chromedriver_binary
+    )
     browser.set_window_size(850, 930)
     return browser
 
@@ -44,7 +47,6 @@ def login(start, until):
     browser.get(start)
     try:
         # Login
-        WebDriverWait
         WebDriverWait(browser, timeout=infinity).until(until)
         print("Done.")
     except TimeoutException:
