@@ -40,7 +40,7 @@ def getStream(url, prev_url=None):
     return stream
 
 
-def saveStreamAs(stream, dest_path):
+def saveStreamAs(stream, dest_path, nc=False):
     """Save a URL to a path as file
     
     Args:
@@ -53,15 +53,21 @@ def saveStreamAs(stream, dest_path):
     from os import path, stat
     from math import inf
 
-    stream_length = stream.headers.get("Content-Length", inf)
-    if path.isfile(dest_path) and stream_length == stat(dest_path).st_size:
-        return False
+    stream_length = float(stream.headers.get("Content-Length", -1))
+    if path.isfile(dest_path):
+        if nc:
+            return False
+        if stream_length == stat(dest_path).st_size:
+            print("Not overwriting same-size file at", dest_path)
+            return False
+        else:
+            print("File sizes do not match for output", dest_path, ":", stream_length, "!=", stat(dest_path).st_size)
 
     _saveChunked(dest_path, stream)
     return True
 
 
-def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug):
+def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False):
     """Saves a file from a URL to a directory.
     
     Args:
@@ -88,7 +94,7 @@ def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug):
             filename = filename_plain + ext_match
 
     dest_path = path.join(dest_directory, filename)
-    return saveStreamAs(stream, dest_path)
+    return saveStreamAs(stream, dest_path, nc=nc)
 
 
 def _saveChunked(path, response):

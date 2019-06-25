@@ -25,6 +25,6 @@ for module in ["image", "audio", "tkit", "pwidgets"]:
 
 if modulesNotFound:
     print(
-        f"WARNING: '{__name__}' submodules {modulesNotImported} not imported, "
+        f"WARNING: Oprional '{__name__}' submodules {modulesNotImported} not imported, "
         f"missing dependencies: {modulesNotFound}"
     )
