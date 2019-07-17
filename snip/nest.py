@@ -13,24 +13,24 @@ class Nest():
         identifier (str): The name of the JSON file backing the dict
     """
     
-    def __init__(self, load=None):
+    def __init__(self, default=None):
         """Args:
             identifier (str): The name of the JSON file backing the dict
             default (dict, optional): Use this dictionary if file errors
-            load (dict, optional): Load this dictionary and replace the file
+            default (dict, optional): Load this dictionary and replace the file
         """
         super(Nest, self).__init__()
-        if load is None:
+        if default is None:
             self.dictionary = dict()
         else:
-            self.dictionary = load
+            self.dictionary = default
 
     def keys(self, root=None):
         if not root:
             root = self.dictionary
         return self.dictionary.keys()
 
-    def get(self, key="", root=None):
+    def get(self, keypath="", default=None, root=None):
         """Summary
         
         Args:
@@ -108,7 +108,7 @@ class Nest():
 
 class FsNest(Nest):
 
-    def __init__(self, identifier, default=None, load=None):
+    def __init__(self, identifier, default=None):
         """Args:
             identifier (str): The name of the JSON file backing the dict
             default (dict, optional): Use this dictionary if file errors
@@ -116,21 +116,6 @@ class FsNest(Nest):
         """
         super(Nest, self).__init__()
         self.identifier = identifier
-        if load is None:
-            try:
-                self.reload()
-            except (FileNotFoundError, JSONDecodeError) as e:
-                if default is None:
-                    raise
-                else:
-                    self.dictionary = default
-        else:
-            self.dictionary = load
-            self.flush()
-
-    def set(self, key, value):
-        super().set(key, value)
-        self.flush()
 
     def reload(self):
         """Load json from file
@@ -146,7 +131,7 @@ class FsNest(Nest):
         self.identifier = newname
         self.flush()
 
-    def flush(self):
+    def save(self):
         """Save data to file
         """
         ju.save(self.dictionary, self.identifier)
@@ -155,7 +140,7 @@ class FsNest(Nest):
 def test():
     """Run test cases
     """
-    nest1 = Nest("Test1", load={})
+    nest1 = Nest()
     nest1.set("nestlvl1", dict())
     nest1.set("nestlvl1.nestlvl2", [3])
     nest1.set("nestlvl1b.nestlvl2", 3)
