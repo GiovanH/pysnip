@@ -57,7 +57,8 @@ def login(start, until):
     sessiondata = {
         "cookies": {c['name']: c['value'] for c in browser.get_cookies()},
         "localStorage": browser.execute_script("return window.localStorage"),
-        "sessionStorage": browser.execute_script("return window.sessionStorage")
+        "sessionStorage": browser.execute_script("return window.sessionStorage"),
+        "location": browser.execute_script("return window.location.href")
     }
     browser.quit()
     return sessiondata
