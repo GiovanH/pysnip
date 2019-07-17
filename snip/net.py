@@ -7,13 +7,26 @@ import bs4
 from .filesystem import easySlug
 
 
+def queryUrlToDict(url):
+    from urllib.parse import urlparse, parse_qs
+    # print(urlparse(url))
+    # print(urlparse(url).query)
+    # print(parse_qs(urlparse(url).query))
+    return parse_qs(urlparse(url).query)
+
+
+def queryDictToUrlSuffix(querydict):
+    from urllib.parse import urlencode, quote_plus
+    return urlencode(querydict, quote_via=quote_plus)
+
+
 def getSoup(url, prev_url=None):
     """Get a BeautifulSoup object from a URL
-    
+
     Args:
         url (str): Remote URL
         prev_url (str, optional): Previous url, for relative resolution
-    
+
     Returns:
         soup: Beautiful Soup
     """
@@ -26,11 +39,11 @@ def getSoup(url, prev_url=None):
 
 def getStream(url, prev_url=None):
     """Extremely light, dumb helper to get a stream from a url
-    
+
     Args:
         url (str): Remote URL
         prev_url (str, optional): Previous url, for relative resolution
-    
+
     Returns:
         Requests stream
     """
@@ -42,7 +55,7 @@ def getStream(url, prev_url=None):
 
 def saveStreamAs(stream, dest_path, nc=False):
     """Save a URL to a path as file
-    
+
     Args:
         stream (stream): Stream
         dest_path (str): Local path
@@ -69,13 +82,13 @@ def saveStreamAs(stream, dest_path, nc=False):
 
 def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False):
     """Saves a file from a URL to a directory.
-    
+
     Args:
         stream (TYPE): Description
         dest_directory (str): Local directory path
         autoExt (bool, optional): Automatically append an extension 
             based on the MIME type
-    
+
     Returns:
         bool: Success
     """
@@ -87,7 +100,7 @@ def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False):
         filename_plain, ext = path.splitext(filename)
         if not ext:
             from ._data import mime2ext
-            
+
             content_type = stream.headers.get("Content-Type")
             ext_match = mime2ext.get(content_type.split(";")[0], "")
 
@@ -99,7 +112,7 @@ def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False):
 
 def _saveChunked(path, response):
     """Save a binary stream to a path. Dumb.
-    
+
     Args:
         path (str): 
         response (response): 
