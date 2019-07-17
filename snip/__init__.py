@@ -10,20 +10,20 @@ from . import jfileutil, loom
 from . import prompt
 from . import nest
 
-import importlib
+# import importlib
 
-modulesNotImported = []
-modulesNotFound = []
+# modulesNotImported = []
+# modulesNotFound = []
 
-for module in ["image", "audio", "tkit", "pwidgets", "net"]:
-    try:
-        importlib.import_module("." + module, __name__)
-    except ModuleNotFoundError as e:
-        modulesNotImported.append(module)
-        modulesNotFound.append(e.name)
+# for module in ["image", "audio", "tkit", "pwidgets", "net"]:
+#     try:
+#         importlib.import_module("." + module, __name__)
+#     except ModuleNotFoundError as e:
+#         modulesNotImported.append(module)
+#         modulesNotFound.append(e.name)
 
-if modulesNotFound:
-    print(
-        f"WARNING: Oprional '{__name__}' submodules {modulesNotImported} not imported, "
-        f"missing dependencies: {modulesNotFound}"
-    )
+# if modulesNotFound:
+#     print(
+#         f"WARNING: Oprional '{__name__}' submodules {modulesNotImported} not imported, "
+#         f"missing dependencies: {modulesNotFound}"
+#     )
