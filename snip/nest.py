@@ -46,36 +46,50 @@ class Nest():
         """
         if not root:
             root = self.dictionary
-        keystack = key.split(".")
+
+        keystack = keypath.split(".")
         while len(keystack) > 0:
             nextkey = keystack.pop(0)
+
+            # If there is no next key, we stop.
             if nextkey == "" or nextkey == "root":
-                root = root
-            else:
-                if root.get(nextkey) is None:
-                    raise KeyError("No path: " + nextkey)
-                root = root[nextkey]
-        if root is None:  # Boolean miss
-            raise ValueError("none: " + nextkey)
+                break
+
+            # If we can't go to the next key, handle it.
+            if root.get(nextkey) is None:
+                if default:
+                    return default
+                else:
+                    raise KeyError("No path:", keypath, nextkey)
+
+            # Go to the next key
+            root = root[nextkey]
+
         return root
 
-    def set(self, key, value):
+    def set(self, keypath, value, makepath=True):
         """Set a key to a value.
         
         Args:
             key (str): Keypath
         """
-        print(key, value)
-        keystack = key.split(".")
+        keystack = keypath.split(".")
         root = self.dictionary
         while len(keystack) > 1:
             nextkey = keystack.pop(0)
+
+            # If there is no next key, we stop.
             if nextkey == "" or nextkey == "root":
-                root = root
-            else:
-                if not root.get(nextkey):
+                break
+
+            if root.get(nextkey) is None:
+                if makepath:
                     root[nextkey] = dict()
-                root = root[nextkey]
+                else:
+                    raise KeyError("No path: ", keypath, nextkey)
+
+            # Traverse
+            root = root[nextkey]
         nextkey = keystack.pop(0)
         root[nextkey] = value
 
