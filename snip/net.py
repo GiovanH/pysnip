@@ -82,7 +82,7 @@ def saveStreamAs(stream, dest_path, nc=False, verbose=True):
     return True
 
 
-def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False):
+def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False, verbose=True):
     """Saves a file from a URL to a directory.
 
     Args:
@@ -109,7 +109,7 @@ def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False):
             filename = filename_plain + ext_match
 
     dest_path = path.join(dest_directory, filename)
-    return saveStreamAs(stream, dest_path, nc=nc)
+    return saveStreamAs(stream, dest_path, nc=nc, verbose=verbose)
 
 
 def _saveChunked(path, response):
