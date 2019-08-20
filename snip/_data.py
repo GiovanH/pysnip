@@ -155,7 +155,6 @@ mime2ext = {
     "text/h323": ".323",
     "text/html": ".htm",
     "text/html": ".html",
-    "text/html": ".stm",
     "text/iuls": ".uls",
     "text/plain": ".bas",
     "text/plain": ".c",
