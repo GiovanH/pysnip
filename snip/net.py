@@ -81,7 +81,7 @@ def saveStreamAs(stream, dest_path, nc=False, verbose=False):
     return True
 
 
-def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False):
+def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, indexHack=False, nc=False):
     """Saves a file from a URL to a directory.
 
     Args:
@@ -99,6 +99,12 @@ def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, nc=False):
 
     if autoExt:
         filename_plain, ext = path.splitext(filename)
+        if not filename_plain:
+            if indexHack:
+                __, filename_plain = path.split(path.normpath(dest_directory))
+                dest_directory = path.normpath(path.join(dest_directory, ".."))
+            else:
+                filename_plain = "index"
         if not ext:
             from ._data import mime2ext
 
