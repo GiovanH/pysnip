@@ -82,7 +82,7 @@ class Spool():
     The spooler can start multiple threads at once.
     """
 
-    def __init__(self, quota, name=None, cfinish={}, belay=False):
+    def __init__(self, quota, name="Spool", cfinish={}, belay=False):
         """Create a spool
         
         Args:
@@ -147,7 +147,7 @@ class Spool():
         self._pbar_max = self.numRunningThreads + len(self.queue)
         if use_pbar and self._pbar_max > 0:
             widgets = [
-                ("[{n}] ".format(n=self.name) if self.name else ''), progressbar.Percentage(),
+                "[{n}] ".format(n=self.name), progressbar.Percentage(),
                 ' ', progressbar.SimpleProgress(format='%(value_s)s of %(max_value_s)s'),
                 ' ', progressbar.Bar(),
                 ' ', DynamicProgressString(name="state"),
@@ -156,15 +156,14 @@ class Spool():
             ]
             self.progbar = progbar = progressbar.ProgressBar(max_value=self._pbar_max, widgets=widgets, redirect_stdout=True)
 
-            def updateProgrssBar():
+            def updateProgressBar():
                 # Update progress bar.
                 q = (len(self.queue) if self.queue else 0)
-                nrt = self.numRunningThreads
-                progress = (self._pbar_max - (nrt + q))
-                state = "[Spool: Q: {q:2}, R: {nrt:2}/{quota}]".format(quota=self.quota, **locals())
+                progress = (self._pbar_max - (self.numRunningThreads + q))
+                state = f"[Spool: Q: {q:2}, R: {self.numRunningThreads:2}/{self.quota}]"
                 progbar.max_value = self._pbar_max
                 progbar.update(progress, state=state)
-            cb = updateProgrssBar
+            cb = updateProgressBar
 
         # assert not self.spoolThread.isAlive, "Background loop did not terminate"
         # Create a spoolloop, but block until it deploys all threads.
@@ -305,139 +304,3 @@ class Spool():
             print("{} threads queued, {}/{} currently running.".format(len(self.queue), self.numRunningThreads, self.quota))
 
 
-def test():
-    """Test threading functionality
-    """
-    from time import sleep
-    from random import random
-
-    work = []
-
-    def dillydally(i, wait):
-        # print("Job", i, "started.")
-        sleep(wait)
-        work.append(i)
-        # print("Job", i, "done.")
-
-    # with Spool(8, cpbar=True) as s:
-    # Spool = FastSpool
-
-    def test_simple_finish():
-        print("Test simple w/ finish.")
-
-        work.clear()
-        s = Spool(2)
-        for i in range(0, 10):
-            s.enqueue(target=dillydally, args=(i, 1))
-
-        # sleep(4)
-        print("Finish.")
-        s.finish(use_pbar=True)
-        print(work, len(work))
-        assert len(work) == 10
-
-        # work.clear()
-        # s = Spool(2)
-        # for i in range(0, 10):
-        #     s.enqueue(target=dillydally, args=(i, 1))
-
-        # sleep(4)
-        # print("Quiet Finish.")
-        # s.finish(use_pbar=False)
-        # print(work, len(work))
-
-        # work.clear()
-        # s = Spool(2)
-        # for i in range(0, 10):
-        #     s.enqueue(target=dillydally, args=(i, 1))
-
-        # sleep(4)
-        # print("Finish and resume.")
-        # s.finish(use_pbar=True, resume=True)
-        # for i in range(10, 20):
-        #     s.enqueue(target=dillydally, args=(i, 1))
-        # sleep(12)
-        # print("Finish.")
-        # s.finish(use_pbar=True)
-        # assert len(work) == 20
-
-    def test_wrapper():
-        print("Test wrapper.")
-
-        work.clear()
-        with Spool(2) as w:
-            for i in range(0, 10):
-                w.enqueue(target=dillydally, args=(i, 3 + random()))
-
-            sleep(2)
-            print("Finish.")
-        print(work, len(work))
-        assert len(work) == 10
-
-        work.clear()
-        with Spool(2) as w:
-            for i in range(0, 10):
-                w.enqueue(target=dillydally, args=(i, random()))
-
-            sleep(2)
-            print("Delayed Finish.")
-        print(work, len(work))
-        assert len(work) == 10
-
-        work.clear()
-        with Spool(2) as w:
-            for i in range(0, 10):
-                w.enqueue(target=dillydally, args=(i, random()))
-
-            sleep(2)
-            print("Quiet finish.")
-        print(work, len(work))
-        assert len(work) == 10
-
-
-    def test_morework():
-        work.clear()
-
-        def nestedWork(sp):
-            work.append("x")
-            if sp:
-                sp.enqueue(nestedWork, (None,))
-                sp.enqueue(nestedWork, (None,))
-
-        with Spool(4) as s:
-            s.enqueue(nestedWork, (s,))
-            s.enqueue(nestedWork, (s,))
-
-        print(work, len(work))
-
-        
-
-    def test_midflush():
-        print("Test mid-work flush.")
-        work.clear()
-        s = Spool(2)
-        
-        s.enqueue(target=dillydally, args=(1, 1))
-        s.enqueue(target=dillydally, args=(2, 3))
-        s.enqueue(target=dillydally, args=(3, 0))
-        s.enqueue(target=dillydally, args=(4, 2))
-        s.flush()
-        s.enqueue(target=dillydally, args=(10, 1))
-        s.enqueue(target=dillydally, args=(20, 3))
-        s.enqueue(target=dillydally, args=(30, 0))
-        s.enqueue(target=dillydally, args=(40, 2))
-
-        sleep(5)
-        print("Finish.")
-        s.finish(use_pbar=True)
-        print(work, len(work))
-        assert len(work) == 8
-
-    #    test_simple_finish()
-    test_morework()
-    # test_wrapper()
-    # test_midflush()
-
-
-if __name__ == '__main__':
-    test()
