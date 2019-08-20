@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def timer():
+def timer(label="task"):
     import time
     start_time = time.time()
 
@@ -12,7 +12,7 @@ def timer():
         yield None
     finally:
         time_taken = time.time() - start_time
-        print(time_taken)
+        print("Processed", label, "in", time_taken, "secs")
 
 
 def bytes_to_string(bytes, units=['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'], sep="", base=1024):
