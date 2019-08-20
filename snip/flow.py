@@ -20,6 +20,22 @@ def execif(function, args=tuple(), kwargs=dict(), condition=lambda f=None: bool(
         function(*args, **kwargs)
 
 
+def slowfunc(delay, func, args=[], kwargs={}):
+    """A wrapper that simply throttles another generator or iterable.
+    Note that this sets a minimum time, and may be invisible for slow functions. 
+    
+    Args:
+        delay (int): Minimum time, in seconds
+        func (Callable): Description
+        args (List): Description
+        kwargs (Dict): Description
+    """
+    from time import time, sleep
+    last = time()
+    func(*args, **kwargs)
+    sleep(max(0, (delay - (time() - last))))
+
+
 def slow(iterable, delay):
     """A generator that simply throttles another generator or iterable.
     Note that this only throttles the generator, and may become invisible for slow functions.
