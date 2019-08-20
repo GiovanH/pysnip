@@ -106,7 +106,7 @@ class Handler():
         if self.readonly:
             raise NotImplemented("Cannot save if readonly is True.")
         else:
-            # print("Flushing", self.name)
+            print("Saving", self.name)
             save(self.obj, self.name, basepath=self.basepath)
 
 
@@ -117,7 +117,7 @@ class RotatingHandler(Handler):
             # File is good, so:
             self.backup()
             return self.obj
-        except (json.JSONDecodeError, FileNotFoundError) as e:
+        except (json.JSONDecodeError, FileNotFoundError):
             print("Warning: data file '{}' corrupted. ".format(self.name))
             if shutil.os.path.isfile(get_json_path(self.basepath, self.name)):
                 # If the file exists, but is corrupted
