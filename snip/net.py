@@ -53,7 +53,7 @@ def getStream(url, prev_url=None):
     return stream
 
 
-def saveStreamAs(stream, dest_path, nc=False):
+def saveStreamAs(stream, dest_path, nc=False, verbose=False):
     """Save a URL to a path as file
 
     Args:
@@ -71,7 +71,8 @@ def saveStreamAs(stream, dest_path, nc=False):
         if nc:
             return False
         if stream_length == stat(dest_path).st_size:
-            print("Not overwriting same-size file at", dest_path)
+            if verbose:
+                print("Not overwriting same-size file at", dest_path)
             return False
         else:
             print("File sizes do not match for output", dest_path, ":", stream_length, "!=", stat(dest_path).st_size)
