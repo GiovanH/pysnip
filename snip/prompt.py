@@ -4,6 +4,7 @@
 # regex matching
 import textwrap
 
+
 def _yes(*args):
     return True
 
@@ -93,7 +94,7 @@ class BasePrompt():
             try:
                 if callable(f) and (f is not self) and matches(f):
                     self.registerCommandFromFunc(f, mutilate)
-            except Exception as e:
+            except Exception:
                 print("Cannot register", f, "as function")
 
     def registerCommandFromFunc(self, func, mutilate=_echo):
@@ -128,7 +129,7 @@ class BasePrompt():
                 with patch_stdout():
                     rawin = psession.prompt(self.pstr)  # prompt(self.pstr)
                     self.handleCommand(rawin)
-        except (KeyboardInterrupt, EOFError) as e:
+        except (KeyboardInterrupt, EOFError):
             # Catch Ctrl-C, Ctrl-D, and exit.
             print("User interrupt.")
         finally:
@@ -147,7 +148,7 @@ class BasePrompt():
             # Run command, if a command matches
             try:
                 match(*inp[1:])
-            except Exception as e:
+            except Exception:
                 import traceback
                 traceback.print_exc()
         else:
