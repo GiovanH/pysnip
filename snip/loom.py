@@ -13,53 +13,11 @@ import progressbar
 from .pwidgets import DynamicProgressString
 from .flow import execif
 
-necessary_threads = 1
 
 
-def extraThreads():
-    """
-    Returns:
-        int: Number of threads, not including main.
-    """
-    return threading.active_count() - necessary_threads
 
 
-def threadWait(threshhold=0, interval=1, quiet=True, use_pbar=True):
-    """Wait for threads to complete.
-    
-    Args:
-        threshhold (int): Wait until at most X extra threads exist.
-        interval (int, optional): Seconds between checking thread status
-        quiet (bool, optional): Print detailed thread status
-        use_pbar (bool, optional): Show progressbar
-    
-    Returns:
-        TYPE: Description
-    """
-    if threshhold < 0:
-        # Short circuit
-        return
 
-    pbar = None
-    if use_pbar and (extraThreads() > threshhold):
-        _max = extraThreads() - threshhold
-        print("Finishing {} background jobs.".format(_max))
-        pbar = progressbar.ProgressBar(max_value=_max, redirect_stdout=True)
-
-    while (extraThreads() > threshhold):
-        c = extraThreads() - threshhold
-
-        if pbar:
-            pbar.update(_max - c)
-
-        if not quiet:
-            print("Waiting for {} job{} to finish:".format(c, "s" if c > 1 else ""))
-            print(threading.enumerate())
-
-        sleep(interval)
-
-    if pbar:
-        pbar.finish()
 
 
 def thread(target, *args, **kwargs):
