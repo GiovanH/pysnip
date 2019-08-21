@@ -75,13 +75,14 @@ def saveStreamAs(stream, dest_path, nc=False, verbose=False):
                 print("Not overwriting same-size file at", dest_path)
             return False
         else:
-            print("File sizes do not match for output", dest_path, ":", stream_length, "!=", stat(dest_path).st_size)
+            if verbose:
+                print("File sizes do not match for output", dest_path, ":", stream_length, "!=", stat(dest_path).st_size)
 
     _saveChunked(dest_path, stream)
     return True
 
 
-def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, indexHack=False, nc=False):
+
     """Saves a file from a URL to a directory.
 
     Args:
@@ -114,7 +115,7 @@ def saveStreamTo(stream, dest_directory, autoExt=True, slug=easySlug, indexHack=
             filename = filename_plain + ext_match
 
     dest_path = path.join(dest_directory, filename)
-    return saveStreamAs(stream, dest_path, nc=nc)
+    return saveStreamAs(stream, dest_path, nc=nc, verbose=verbose)
 
 
 def _saveChunked(path, response):
