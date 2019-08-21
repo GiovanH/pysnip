@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from string import Formatter
 
-from .string import timestamp
+from .strings import timestamp
 
 
 class ContextPrinter():

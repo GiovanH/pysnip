@@ -5,7 +5,7 @@ Snip
 Snip: A library of generic helper functions for utility programs.
 """
 
-from . import data, filesystem, flow, hash, stream, string 
+from . import data, filesystem, flow, hash, stream, strings
 from . import jfileutil, loom
 from . import prompt
 from . import nest
