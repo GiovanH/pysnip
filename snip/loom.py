@@ -9,14 +9,11 @@ Attributes:
 
 from time import sleep
 import threading
-import progressbar
+
+import tqdm
+
 from .pwidgets import DynamicProgressString
 from .flow import execif
-
-
-
-
-
 
 
 
@@ -104,23 +101,21 @@ class Spool():
         # Progress bar management, optional.
         self._pbar_max = self.numRunningThreads + len(self.queue)
         if use_pbar and self._pbar_max > 0:
-            widgets = [
-                "[{n}] ".format(n=self.name), progressbar.Percentage(),
-                ' ', progressbar.SimpleProgress(format='%(value_s)s of %(max_value_s)s'),
-                ' ', progressbar.Bar(),
-                ' ', DynamicProgressString(name="state"),
-                ' ', progressbar.Timer(),
-                ' ', progressbar.AdaptiveETA(),
-            ]
-            self.progbar = progbar = progressbar.ProgressBar(max_value=self._pbar_max, widgets=widgets, redirect_stdout=True)
+            self.progbar = progbar = tqdm.tqdm(
+                desc=self.name,
+                total=self._pbar_max,
+                unit="job"
+            )
 
             def updateProgressBar():
                 # Update progress bar.
                 q = (len(self.queue) if self.queue else 0)
                 progress = (self._pbar_max - (self.numRunningThreads + q))
-                state = f"[Spool: Q: {q:2}, R: {self.numRunningThreads:2}/{self.quota}]"
-                progbar.max_value = self._pbar_max
-                progbar.update(progress, state=state)
+
+                progbar.total = self._pbar_max
+                progbar.n = progress
+                progbar.set_postfix(queue=q, running=f"{self.numRunningThreads:2}/{self.quota}]")
+                progbar.update(0)
             cb = updateProgressBar
 
         # assert not self.spoolThread.isAlive, "Background loop did not terminate"
@@ -136,7 +131,7 @@ class Spool():
         assert self.numRunningThreads == 0, "Finished without finishing all threads"
         
         if cb:
-            progbar.finish()
+            progbar.close()
 
         if resume:
             self.queue.clear()  # Create a fresh queue
