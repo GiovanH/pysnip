@@ -3,3 +3,7 @@ pytest
 progressbar2
 bs4
 pyyaml
+tqdm
+pandas
+requests
+urllib3
