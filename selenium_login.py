@@ -1,6 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 import os
 import subprocess
 import sys
@@ -42,23 +42,43 @@ def loadBrowser():
 
 
 def login(start, until):
-    browser = loadBrowser()
-
-    browser.get(start)
     try:
-        # Login
-        WebDriverWait(browser, timeout=infinity).until(until)
-        print("Done.")
-    except TimeoutException:
-        print("Time out! Go faster next time. ")
-        browser.quit()
-        raise
+        browser = loadBrowser()
 
-    sessiondata = {
-        "cookies": {c['name']: c['value'] for c in browser.get_cookies()},
-        "localStorage": browser.execute_script("return window.localStorage"),
-        "sessionStorage": browser.execute_script("return window.sessionStorage"),
-        "location": browser.execute_script("return window.location.href")
-    }
-    browser.quit()
+        browser.get(start)
+        try:
+            # Login
+            WebDriverWait(browser, timeout=infinity).until(until)
+            print("Done.")
+        except TimeoutException:
+            print("Time out! Go faster next time. ")
+            browser.quit()
+            raise
+
+        sessiondata = {
+            "cookies": {c['name']: c['value'] for c in browser.get_cookies()},
+            "localStorage": browser.execute_script("return window.localStorage"),
+            "sessionStorage": browser.execute_script("return window.sessionStorage"),
+            "location": browser.execute_script("return window.location.href")
+        }
+        browser.quit()
+    except WebDriverException:
+        import pyperclip
+        print(f"Fallback: Please copy cookies.txt from site {start} and press enter.")
+        input()
+        cookiestxt = pyperclip.paste()
+
+        cookies = {}
+        for line in cookiestxt.split("\n"):
+            if line.startswith("#"):
+                continue
+            domain, __, subdir, __, __, name, value = line.split("\t")
+            cookies[name] = value
+
+        sessiondata = {
+            "cookies": cookies,
+            "localStorage": "UNIMPLEMENTED",
+            "sessionStorage": "UNIMPLEMENTED",
+            "location": "UNIMPLEMENTED"
+        }
     return sessiondata
