@@ -82,28 +82,35 @@ def saveStreamAs(stream, dest_path, nc=False, verbose=False):
     return True
 
 
-def getFilename(stream, slug=easySlug):
+def getFilename(stream, indexHack=True, slug=easySlug):
     # Cases to consider:
     # /(index.html)
     # /document
     # /document.pdf
-
     from os import path
-    
+    import re
+
     filename = easySlug(stream.url.split("/")[-1])
+    (dirname,) = re.search("/([^/]+)/$", stream.url).groups()
+    dirname = easySlug(dirname)
     filename_plain, ext = path.splitext(filename)
+
     if not filename_plain:
+        # We are seeing the page from a directory, i.e. index.html
         if indexHack:
-            __, filename_plain = path.split(path.normpath(dest_directory))
-            dest_directory = path.normpath(path.join(dest_directory, ".."))
+            filename_plain = path.join("..", dirname + ".html")
         else:
             filename_plain = "index"
     if not ext:
-        from ._data import mime2ext
+        filename_plain = filename_plain + guessExtension(stream)
+    return filename_plain
 
-        content_type = stream.headers.get("Content-Type")
-        ext_match = mime2ext.get(content_type.split(";")[0], "")
+def guessExtension(stream):
+    from ._data import mime2ext
+    content_type = stream.headers.get("Content-Type")
+    ext_match = mime2ext.get(content_type.split(";")[0], "")
     return ext_match
+    
 
 
 def saveStreamTo(stream, dest_directory, autoExt=True, nc=False, verbose=False, slug=easySlug):
