@@ -75,7 +75,13 @@ def json_save(object, filepath, basepath=basepath_json):
         shutil.move(filepath, filepath + ".bak")
 
     with open(filepath, 'w') as file:
-        json.dump(object, file, indent=4)
+        try:
+            json.dump(object, file, indent=4)
+        except RuntimeError:
+            import copy
+            import traceback
+            traceback.print_exc()
+            json.dump(copy.deepcopy(object), file, indent=4)
 
 
 load = json_load
