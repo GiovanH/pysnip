@@ -1,9 +1,10 @@
 """Networking functions
 """
 
-from urllib.parse import urljoin
+import urllib.parse
 import requests
 import bs4
+import os
 from .filesystem import easySlug
 
 
@@ -30,7 +31,7 @@ def getSoup(url, prev_url=None):
     Returns:
         soup: Beautiful Soup
     """
-    url = urljoin(prev_url, url)
+    url = urllib.parse.urljoin(prev_url, url)
     resp = requests.get(url)
     resp.raise_for_status()
     soup = bs4.BeautifulSoup(resp.text, features="html.parser")
@@ -47,7 +48,7 @@ def getStream(url, prev_url=None):
     Returns:
         Requests stream
     """
-    url = urljoin(prev_url, url)
+    url = urllib.parse.urljoin(prev_url, url)
     stream = requests.get(url, stream=True)
     stream.raise_for_status()
     return stream
@@ -90,30 +91,45 @@ def getFilename(stream, indexHack=True, slug=easySlug):
     from os import path
     import re
 
-    filename = easySlug(stream.url.split("/")[-1])
-    (dirname,) = re.search("/([^/]+)/$", stream.url).groups()
-    dirname = easySlug(dirname)
+    disposition = stream.headers.get("content-disposition")
+    if disposition:
+        # If the response has Content-Disposition, try to get filename from it
+        cd = dict(
+            map(
+                lambda x: x.strip().split('=') if '=' in x else (x.strip(), ''),
+                disposition.split(';')
+            )
+        )
+        if 'filename' in cd:
+            filename = urllib.parse.unquote(cd['filename'].strip("\"'"))
+            if filename:
+                return slug(urllib.parse.unquote(filename))
+
+    filename = slug(stream.url.split("/")[-1])
     filename_plain, ext = path.splitext(filename)
 
     if not filename_plain:
         # We are seeing the page from a directory, i.e. index.html
+        (dirname,) = re.search("/([^/]+)/$", stream.url).groups()
+        dirname = slug(dirname)
+
         if indexHack:
-            filename_plain = path.join("..", dirname + ".html")
+            filename = path.join("..", dirname + ".html")
         else:
-            filename_plain = "index"
-    if not ext:
-        filename_plain = filename_plain + guessExtension(stream)
-    return filename_plain
+            filename = "index.html"
+    elif not ext:
+        filename = filename_plain + guessExtension(stream)
+    return filename
+
 
 def guessExtension(stream):
     from ._data import mime2ext
     content_type = stream.headers.get("Content-Type")
     ext_match = mime2ext.get(content_type.split(";")[0], "")
     return ext_match
-    
 
 
-def saveStreamTo(stream, dest_directory, autoExt=True, nc=False, verbose=False, slug=easySlug):
+def saveStreamTo(stream, dest_directory, autoExt=True, nc=False, verbose=False, slug=easySlug, indexHack=True):
     """Saves a file from a URL to a directory.
 
     Args:
@@ -130,7 +146,7 @@ def saveStreamTo(stream, dest_directory, autoExt=True, nc=False, verbose=False, 
     filename = slug(stream.url.split("/")[-1])
 
     if autoExt:
-        filename = getFilename(stream, slug=slug)
+        filename = getFilename(stream, slug=slug, indexHack=indexHack)
 
     dest_path = path.join(dest_directory, filename)
     return saveStreamAs(stream, dest_path, nc=nc, verbose=verbose)
@@ -146,3 +162,14 @@ def _saveChunked(path, response):
     with open(path, 'wb') as file:
         for chunk in response:
             file.write(chunk)
+
+
+def mirrorUrl(url, dest_directory, nc=False, slug=easySlug):
+    return mirror(getStream(url), dest_directory, nc=nc, slug=slug)
+
+
+def mirror(stream, dest_directory, nc=False, slug=easySlug):
+    p = [easySlug(x) for x in stream.url.split("/")]
+    dest_directory = os.path.join(dest_directory, *p[2:-1])
+    os.makedirs(dest_directory, exist_ok=True)
+    return saveStreamTo(stream, dest_directory, nc=nc, indexHack=False)
