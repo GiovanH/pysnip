@@ -68,7 +68,7 @@ class Spool():
         self.finish(resume=False, **self.cfinish)
 
     def __str__(self):
-        return "{} at {}: {} threads queued, {}/{} currently running".format(type(self), hex(id(self)), len(self.queue), self.numRunningThreads, self.quota)
+        return f"{type(self)} at {hex(id(self))}: {self.numRunningThreads}/{self.quota} threads running with {len(self.queue)} queued."
 
     # Interfaces
 
@@ -92,45 +92,51 @@ class Spool():
         self.background_spool = False
         self.dirty.set()
 
-        # By default, we don't use a callback.
-        cb = None
-
         if verbose:
             print(self)
 
         # Progress bar management, optional.
+        def updateProgressBar():
+            # Update progress bar.
+            q = (len(self.queue) if self.queue else 0)
+            progress = (self._pbar_max - (self.numRunningThreads + q))
+
+            progbar.total = self._pbar_max
+            progbar.n = progress
+            progbar.set_postfix(queue=q, running=f"{self.numRunningThreads:2}/{self.quota}]")
+            progbar.update(0)
+
         self._pbar_max = self.numRunningThreads + len(self.queue)
-        if use_pbar and self._pbar_max > 0:
+        if use_pbar:
             self.progbar = progbar = tqdm.tqdm(
                 desc=self.name,
                 total=self._pbar_max,
                 unit="job"
             )
 
-            def updateProgressBar():
-                # Update progress bar.
-                q = (len(self.queue) if self.queue else 0)
-                progress = (self._pbar_max - (self.numRunningThreads + q))
-
-                progbar.total = self._pbar_max
-                progbar.n = progress
-                progbar.set_postfix(queue=q, running=f"{self.numRunningThreads:2}/{self.quota}]")
-                progbar.update(0)
-            cb = updateProgressBar
+            updateProgressBar()
 
         # assert not self.spoolThread.isAlive, "Background loop did not terminate"
         # Create a spoolloop, but block until it deploys all threads.
-        execif(cb)
         while (self.queue and len(self.queue) > 0) or (self.numRunningThreads > 0):
             self.dirty.wait()
-            self.doSpool(verbose=verbose)        
-            self.dirty.clear()
-            execif(cb)
+            threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
+            if verbose:
+                print(self)
+            for i in range(threads_to_queue):
+                try:
+                    self.startThread(self.queue.pop(0))
+                except IndexError:
+                    print(f"IndexError: Popped from empty queue?\nWhile queueing thread {i} of {threads_to_queue}\n{len(self.queue)}-{self.quota}-{self.numRunningThreads}")
+            if use_pbar:
+                updateProgressBar()
+            self.dirty.set()
+        updateProgressBar()
 
         assert len(self.queue) == 0, "Finished without deploying all threads"
         assert self.numRunningThreads == 0, "Finished without finishing all threads"
         
-        if cb:
+        if use_pbar:
             progbar.close()
 
         if resume:
@@ -218,11 +224,12 @@ class Spool():
         Args:
             verbose (bool, optional): Report progress towards queue completion.
         """
-        while self.background_spool:
+        while True:
             self.dirty.wait()
+            if not self.background_spool:
+                break
             #   self.dirty.set()
-            self.doSpool(verbose=verbose)        
-            self.dirty.clear()
+            self.doSpool(verbose=verbose)      
 
     def doSpool(self, verbose=False):
         """Spools new threads until the queue empties or the quota fills.
@@ -236,24 +243,16 @@ class Spool():
             if self.numRunningThreads == 0:
                 self.flushing = 0
             else:
+                self.dirty.clear()
                 return
-            # elif self.flushing == 2:
-            #     # Deploy entire queue
-            #     if len(self.queue) == 0:
-            #         self.flushing = 3
-            # elif self.flushing == 3:
-            #     self.flushing = 0
-
-            # else:
-            #     # Otherwise don't deploy
-            #     return
 
         # Start threads until we've hit quota, or until we're out of threads.
-        while len(self.queue) > 0 and (self.numRunningThreads < self.quota):
+        # threads_to_queue = 
+        while min(len(self.queue), self.quota - self.numRunningThreads) > 0:
+            if verbose:
+                print(self)
+            # for i in range(threads_to_queue):
             self.startThread(self.queue.pop(0))
+            # threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
 
-        if verbose:
-            print(self.running_threads)
-            print("{} threads queued, {}/{} currently running.".format(len(self.queue), self.numRunningThreads, self.quota))
-
-
+        self.dirty.clear()
