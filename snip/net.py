@@ -167,9 +167,11 @@ def _saveChunked(path, response):
 def mirrorUrl(url, dest_directory, nc=False, slug=easySlug):
     return mirror(getStream(url), dest_directory, nc=nc, slug=slug)
 
+def getMirrorDir(url, slug=easySlug):
+    p = [slug(x) for x in url.split("/")]
+    return os.path.join(*p[2:-1])
 
 def mirror(stream, dest_directory, nc=False, slug=easySlug):
-    p = [easySlug(x) for x in stream.url.split("/")]
-    dest_directory = os.path.join(dest_directory, *p[2:-1])
+    dest_directory = os.path.join(dest_directory, getMirrorDir(stream.url, slug))
     os.makedirs(dest_directory, exist_ok=True)
     return saveStreamTo(stream, dest_directory, nc=nc, indexHack=False)
