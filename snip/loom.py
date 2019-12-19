@@ -9,7 +9,7 @@ Attributes:
 
 from time import sleep
 import threading
-
+import traceback
 import tqdm
 
 from .pwidgets import DynamicProgressString
@@ -164,8 +164,12 @@ class Spool():
             **thkwargs: Kwargs for threading.Thread
         """
         def runAndFlag():
-            target(*args, **kwargs)
-            self.dirty.set()
+            try:
+                target(*args, **kwargs)
+            except Exception:
+                traceback.print_exc()
+            finally:
+                self.dirty.set()
         self.queue.append(threading.Thread(target=runAndFlag, *thargs, **thkwargs))
         self._pbar_max += 1
         self.dirty.set()
