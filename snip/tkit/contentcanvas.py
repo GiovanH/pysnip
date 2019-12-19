@@ -16,24 +16,24 @@ from tkinter import filedialog
 import subprocess
 import threading
 import datetime
-
+import win32clipboard
 
 IMAGEEXTS = ["png", "jpg", "gif", "bmp", "jpeg", "tif", "gifv", "jfif"]
-VIDEOEXTS = ["webm", "mp4", "mov"]
+VIDEOEXTS = ["webm", "mp4", "mov", "webp"]
 _IMAGEEXTS = ["." + e for e in IMAGEEXTS]
 _VIDEOEXTS = ["." + e for e in VIDEOEXTS]
 
 
-def copy_to_clipboard(filepath):
-    from io import BytesIO
-    import win32clipboard
-    from PIL import Image
+def send_to_clipboard(clip_type, data):
+    win32clipboard.OpenClipboard()
+    win32clipboard.EmptyClipboard()
+    win32clipboard.SetClipboardData(clip_type, data)
+    win32clipboard.CloseClipboard()
 
-    def send_to_clipboard(clip_type, data):
-        win32clipboard.OpenClipboard()
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardData(clip_type, data)
-        win32clipboard.CloseClipboard()
+
+def copy_imdata_to_clipboard(filepath):
+    from io import BytesIO
+    from PIL import Image
 
     image = Image.open(filepath)
 
@@ -43,6 +43,13 @@ def copy_to_clipboard(filepath):
     output.close()
 
     send_to_clipboard(win32clipboard.CF_DIB, data)
+
+
+def copy_text_to_clipboard(text):
+    win32clipboard.OpenClipboard()
+    win32clipboard.EmptyClipboard()
+    win32clipboard.SetClipboardText(text, win32clipboard.CF_TEXT)
+    win32clipboard.CloseClipboard()
 
 
 class ContentCanvas(tk.Canvas):
@@ -75,7 +82,8 @@ class ContentCanvas(tk.Canvas):
 
         # create a menu
         popup = tk.Menu(self, tearoff=0)
-        popup.add_command(label="Copy to clipboard", command=lambda: copy_to_clipboard(self.current_file))  # , command=next) etc...
+        popup.add_command(label="Copy image", command=lambda: copy_imdata_to_clipboard(self.current_file))  # , command=next) etc...
+        popup.add_command(label="Copy path", command=lambda: copy_text_to_clipboard(self.current_file))  # , command=next) etc...
         popup.add_separator()
         popup.add_command(label="Open", command=lambda: os.startfile(self.current_file))
         popup.add_command(label="Open file location", command=self.open_file_location)
@@ -109,7 +117,7 @@ class ContentCanvas(tk.Canvas):
         snip.filesystem.copyFileToFile(self.current_file, newFileName)
 
     def quicksave(self, event=None):
-        downloads = snip.filesystem.userProfile("Downloads")
+        downloads = snip.filesystem.userProfile("Pictures")
         snip.filesystem.copyFileToDir(self.current_file, downloads)
         self.bell()
 
@@ -266,8 +274,9 @@ class ContentCanvas(tk.Canvas):
         maxwidth = self.winfo_width()
         maxheight = self.winfo_height()
         # Let window load
-        if maxwidth == maxheight == 1:
+        if maxwidth <= 1 or maxheight <= 1:
             self.after(200, self.makePhotoImage, filename, ALWAYS_RESIZE, stepsize)
+            return None
 
         pilimg = self.photoImageCache.get(filename)
 
@@ -308,11 +317,12 @@ class ContentCanvas(tk.Canvas):
                     # else:
                     #     print("Warning: stepratio =", stepratio, "with ratio", ratio, "and stepsize", stepsize)
                 try:
-                    # print(f"Resize: ratio {ratio}, method {method}, stepsize {stepsize}\n{filename}")
+                    # print(f"Resize: mw{maxwidth}, mh{maxheight}, w{pilimg.width}, h{pilimg.height}, ratio {ratio}, method {method}, stepsize {stepsize}\n{filename}")
                     pilimg = pilimg.resize(
                         (int(pilimg.width * ratio), int(pilimg.height * ratio)), method)
                 except (OSError, ValueError):
                     print("OS error resizing file", filename)
+                    # raise
                     # loc = None
                     # for loc in locals():
                     #     print(loc, ":", locals().get(loc))
@@ -327,6 +337,8 @@ class ContentCanvas(tk.Canvas):
                         messagebox.showwarning("Bad image", traceback.format_exc())
                         self.filepaths.remove(filename)
                         self.imageUpdate()
+                    except Exception:
+                        raise
 
             self.photoImageCache[filename] = pilimg
             loom.thread(target=self.pruneImageCache, name="pruneImageCache")
