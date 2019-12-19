@@ -1,5 +1,88 @@
 # File handling
 
+import os
+import sys
+
+
+class Trash(object):
+
+    def __init__(self, queue_size=20, verbose=False):
+        super().__init__()
+
+        from .loom import Spool
+
+        self.verbose = verbose
+        self.queue_size = queue_size
+
+        self.trash_queue = []
+        try:
+            from send2trash import send2trash
+            self._osTrash = send2trash
+        except ImportError:
+            print("send2trash unavailible, using unsafe delete", file=sys.stderr)
+            self._osTrash = os.unlink
+
+        self.spool = Spool(8, "os trash")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.finish()
+
+    def __str__(self):
+        return str(self.trash_queue)
+
+    def enforceQueueSize(self):
+        while len(self.trash_queue) > self.queue_size:
+            self.commitDelete(self.trash_queue[0])
+
+    def isfile(self, path):
+        if path in self.trash_queue:
+            return False
+        else:
+            return os.path.isfile(path)
+
+    def commitDelete(self, path):
+        self.spool.enqueue(self._osTrash, args=(path,))
+        
+        if self.verbose:
+            print("{} --> {} --> {}".format("[SNIPTRASH]", path, "[OS TRASH]"))
+        if path in self.trash_queue:
+            self.trash_queue.remove(path)
+        else:
+            print(f"warning: deleted file '{path}' not in trash!", file=sys.stderr)
+
+    def delete(self, path):
+        if path in self.trash_queue:
+            print(f"warning: attempted to delete already trashed file '{path}'", file=sys.stderr)
+            return False
+        elif not os.path.isfile(path):
+            print(f"warning: attempted to delete non-existent file '{path}'", file=sys.stderr)
+            return False
+
+        self.trash_queue.append(path)
+        if self.verbose:
+            print("{} --> {}".format(path, "[SNIPTRASH]"))
+        self.enforceQueueSize()
+        return True
+
+    def undo(self):
+        if self.trash_queue:
+            path = self.trash_queue.pop()
+            if self.verbose:
+                print("{} <-- {}".format(path, "[SNIPTRASH]"))
+            return path
+        else:
+            return False
+
+    def finish(self):
+        for path in self.trash_queue:
+            self.commitDelete(path)
+        self.spool.finish()
+
+
+
 
 def easySlug(string, repl="-", directory=False):
     import re
