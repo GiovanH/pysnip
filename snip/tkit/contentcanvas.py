@@ -258,6 +258,12 @@ class ContentCanvas(tk.Canvas):
         self.textCache[filepath] = text
         return text
 
+    # def makePhotoImage(self, filename, ALWAYS_RESIZE=True, stepsize=4):
+    #     with snip.math.timer("makePhotoImage {}".format(filename)):
+    #         _makePhotoImage(self, filename, ALWAYS_RESIZE, stepsize)
+
+    # def _makePhotoImage(self, filename, ALWAYS_RESIZE=True, stepsize=4):
+
     def makePhotoImage(self, filename, ALWAYS_RESIZE=True, stepsize=4):
         """Make a resized photoimage given a filepath
 
@@ -283,62 +289,61 @@ class ContentCanvas(tk.Canvas):
         if pilimg:
             return ImageTk.PhotoImage(pilimg)
 
-        with snip.math.timer("makePhotoImage {}".format(filename)):
-            (filename_, fileext) = os.path.splitext(filename)
-            canResize = True
+        (filename_, fileext) = os.path.splitext(filename)
+        canResize = True
 
+        try:
+            if fileext.lower() in _IMAGEEXTS:
+                pilimg = Image.open(filename)
+                pilimg = snip.image.autoRotate(pilimg)
+
+            elif fileext.lower() in _VIDEOEXTS:
+                capture = cv2.VideoCapture(filename)
+                capture.grab()
+                flag, frame = capture.retrieve()
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                pilimg = Image.fromarray(frame)
+            else:
+                raise OSError("Exception reading image")
+        except (cv2.error, OSError,):
+            pilimg = Image.new('RGB', (10, 10), color=(0, 0, 0))
+            ImageDraw.Draw(pilimg).text((2, 0), "?", fill=(255, 255, 255))
+
+        imageIsTooBig = pilimg.width > maxwidth or pilimg.height > maxheight
+        if (imageIsTooBig and canResize) or ALWAYS_RESIZE:
+            ratio = min(maxwidth / pilimg.width, maxheight / pilimg.height)
+            method = Image.ANTIALIAS
+
+            if not imageIsTooBig:
+                stepratio = floor(ratio * stepsize) / stepsize
+                if stepratio != 0:
+                    ratio = stepratio
+                    method = Image.LINEAR
+                # else:
+                #     print("Warning: stepratio =", stepratio, "with ratio", ratio, "and stepsize", stepsize)
             try:
-                if fileext.lower() in _IMAGEEXTS:
-                    pilimg = Image.open(filename)
-                    pilimg = snip.image.autoRotate(pilimg)
-
-                elif fileext.lower() in _VIDEOEXTS:
-                    capture = cv2.VideoCapture(filename)
-                    capture.grab()
-                    flag, frame = capture.retrieve()
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    pilimg = Image.fromarray(frame)
-                else:
-                    raise OSError("Exception reading image")
-            except (cv2.error, OSError,):
-                pilimg = Image.new('RGB', (10, 10), color=(0, 0, 0))
-                ImageDraw.Draw(pilimg).text((2, 0), "?", fill=(255, 255, 255))
-
-            imageIsTooBig = pilimg.width > maxwidth or pilimg.height > maxheight
-            if (imageIsTooBig and canResize) or ALWAYS_RESIZE:
-                ratio = min(maxwidth / pilimg.width, maxheight / pilimg.height)
-                method = Image.ANTIALIAS
-
-                if not imageIsTooBig:
-                    stepratio = floor(ratio * stepsize) / stepsize
-                    if stepratio != 0:
-                        ratio = stepratio
-                        method = Image.LINEAR
-                    # else:
-                    #     print("Warning: stepratio =", stepratio, "with ratio", ratio, "and stepsize", stepsize)
+                # print(f"Resize: mw{maxwidth}, mh{maxheight}, w{pilimg.width}, h{pilimg.height}, ratio {ratio}, method {method}, stepsize {stepsize}\n{filename}")
+                pilimg = pilimg.resize(
+                    (int(pilimg.width * ratio), int(pilimg.height * ratio)), method)
+            except (OSError, ValueError):
+                print("OS error resizing file", filename)
+                # raise
+                # loc = None
+                # for loc in locals():
+                #     print(loc, ":", locals().get(loc))
                 try:
-                    # print(f"Resize: mw{maxwidth}, mh{maxheight}, w{pilimg.width}, h{pilimg.height}, ratio {ratio}, method {method}, stepsize {stepsize}\n{filename}")
-                    pilimg = pilimg.resize(
-                        (int(pilimg.width * ratio), int(pilimg.height * ratio)), method)
-                except (OSError, ValueError):
-                    print("OS error resizing file", filename)
-                    # raise
-                    # loc = None
-                    # for loc in locals():
-                    #     print(loc, ":", locals().get(loc))
-                    try:
-                        return ImageTk.PhotoImage(pilimg)
-                    except SyntaxError:
-                        print("Corrupt image")
-                        raise
-                    except (MemoryError, tk.TclError):
-                        print("Corrupt image, I think?")
-                        print(filename)
-                        messagebox.showwarning("Bad image", traceback.format_exc())
-                        self.filepaths.remove(filename)
-                        self.imageUpdate()
-                    except Exception:
-                        raise
+                    return ImageTk.PhotoImage(pilimg)
+                except SyntaxError:
+                    print("Corrupt image")
+                    raise
+                except (MemoryError, tk.TclError):
+                    print("Corrupt image, I think?")
+                    print(filename)
+                    messagebox.showwarning("Bad image", traceback.format_exc())
+                    self.filepaths.remove(filename)
+                    self.imageUpdate()
+                except Exception:
+                    raise
 
             self.photoImageCache[filename] = pilimg
             loom.thread(target=self.pruneImageCache, name="pruneImageCache")
