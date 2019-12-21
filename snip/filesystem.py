@@ -48,6 +48,7 @@ class Trash(object):
         
         if self.verbose:
             print("{} --> {} --> {}".format("[SNIPTRASH]", path, "[OS TRASH]"))
+
         if path in self.trash_queue:
             self.trash_queue.remove(path)
         else:
@@ -77,7 +78,7 @@ class Trash(object):
             return False
 
     def finish(self):
-        for path in self.trash_queue:
+        for path in self.trash_queue.copy():
             self.commitDelete(path)
         self.spool.finish()
 
