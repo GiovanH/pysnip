@@ -5,6 +5,11 @@ from contextlib import contextmanager
 
 @contextmanager
 def timer(label="task"):
+    """Times a code block and prints time taken to screen
+    
+    Args:
+        label (str, optional): Description of task
+    """
     import time
     start_time = time.time()
 
