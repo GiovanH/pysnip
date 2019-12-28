@@ -14,7 +14,6 @@ import os
 from threading import Lock
 from tkinter import filedialog
 import subprocess
-import threading
 import datetime
 import win32clipboard
 
@@ -65,11 +64,16 @@ class ContentCanvas(tk.Canvas):
         self.textCache = {}
 
         self.preloaderLock = Lock()
+        self.spool = loom.Spool(8, "ContentCanvas")
 
         self.current_file = ""
 
         # Initialize window
         self.initwindow()
+
+    def destroy(self):
+        self.spool.finish()
+        super().destroy()
 
     def initwindow(self):
         # set first image on canvas, an ImageTk.PhotoImage
@@ -143,7 +147,7 @@ class ContentCanvas(tk.Canvas):
         """Update the display to match the current image index.
         """
 
-        self.current_file = filepath
+        self.current_file = os.path.normpath(filepath)
 
         # try:
         #     self.curimg = self.makePhotoImage(filepath)
@@ -157,7 +161,10 @@ class ContentCanvas(tk.Canvas):
         return True
 
     def configureForFile(self, filepath):
-        text = None
+        text = "No selection."
+
+        if not filepath:
+            return
 
         (filename_, fileext) = os.path.splitext(filepath)
         if fileext.lower() in _IMAGEEXTS or fileext.lower() in _VIDEOEXTS:
@@ -171,16 +178,20 @@ class ContentCanvas(tk.Canvas):
             self.curimg = None
 
     def preloadImage(self, filepaths):
+        if len(filepaths) > 20:
+            return
         for filepath in filepaths:
             if filepath not in self.photoImageCache.keys():
-                threading.Thread(
-                    target=self.makePhotoImage,
-                    args=(
-                        filepath,
-                        self.winfo_width(),
-                        self.winfo_height(),
+                def _do():
+                    self.spool.enqueue(
+                        target=self.makePhotoImage,
+                        args=(
+                            filepath,
+                            self.winfo_width(),
+                            self.winfo_height(),
+                        )
                     )
-                ).start()
+                self.after_idle(_do)
         # return
         # with self.preloaderLock:
         #     with loom.Spool(6, cfinish=dict(use_pbar=False)) as spool:
@@ -264,6 +275,11 @@ class ContentCanvas(tk.Canvas):
 
     # def _makePhotoImage(self, filename, ALWAYS_RESIZE=True, stepsize=4):
 
+    def placeholderImage(self):
+        pilimg = Image.new('RGB', (10, 10), color=(0, 0, 0))
+        ImageDraw.Draw(pilimg).text((2, 0), "?", fill=(255, 255, 255))
+        return pilimg
+
     def makePhotoImage(self, filename, ALWAYS_RESIZE=True, stepsize=4):
         """Make a resized photoimage given a filepath
 
@@ -306,8 +322,7 @@ class ContentCanvas(tk.Canvas):
             else:
                 raise OSError("Exception reading image")
         except (cv2.error, OSError,):
-            pilimg = Image.new('RGB', (10, 10), color=(0, 0, 0))
-            ImageDraw.Draw(pilimg).text((2, 0), "?", fill=(255, 255, 255))
+            pilimg = self.placeholderImage()
 
         imageIsTooBig = pilimg.width > maxwidth or pilimg.height > maxheight
         if (imageIsTooBig and canResize) or ALWAYS_RESIZE:
@@ -335,7 +350,7 @@ class ContentCanvas(tk.Canvas):
                     return ImageTk.PhotoImage(pilimg)
                 except SyntaxError:
                     print("Corrupt image")
-                    raise
+                    pilimg = self.placeholderImage()
                 except (MemoryError, tk.TclError):
                     print("Corrupt image, I think?")
                     print(filename)
