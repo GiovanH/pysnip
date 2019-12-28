@@ -1,4 +1,9 @@
 chrome/*/*
+tests/*.txt
+tests/*.csv
+databases/
+snip/tests/*.csv
+snip/tests/*.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
