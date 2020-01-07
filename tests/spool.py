@@ -40,6 +40,6 @@ class TestData(object):
 
 
 if __name__ == '__main__':
-    TestData().test_print()
     TestData().test_fast()
+    TestData().test_print()
     TestData().test_slow()

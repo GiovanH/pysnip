@@ -10,6 +10,9 @@ Attributes:
 import threading
 import tqdm
 import traceback
+import contextlib
+import sys
+from tqdm.contrib import DummyTqdmFile
 
 
 def thread(target, *args, **kwargs):
@@ -113,7 +116,10 @@ class Spool():
 
         try:
             if use_pbar:
+                orig_out_err = sys.stdout, sys.stderr
+                sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
                 self.progbar = progbar = tqdm.tqdm(
+                    file=orig_out_err[0], dynamic_ncols=True,
                     desc=self.name,
                     total=self._pbar_max,
                     unit="job"
@@ -142,6 +148,7 @@ class Spool():
         finally:
             if use_pbar:
                 progbar.close()
+                sys.stdout, sys.stderr = orig_out_err
 
         if resume:
             self.queue.clear()  # Create a fresh queue
