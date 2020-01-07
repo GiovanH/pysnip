@@ -5,6 +5,42 @@ from string import Formatter
 
 from .strings import timestamp
 
+import logging
+
+
+def makeLogHandler(base, level, format_string):
+    h = base
+    h.setLevel(level)  
+    h.setFormatter(logging.Formatter(format_string))
+    return h
+
+
+active_log_handlers = {}
+
+
+def TriadLogger(__name, stream=True, file=True, debug=True):
+    global active_log_handlers
+    
+    logger = logging.getLogger(__name)
+    logger.setLevel(logging.DEBUG)
+
+    if stream:
+        if not active_log_handlers.get("stream"):
+            active_log_handlers["stream"] = makeLogHandler(logging.StreamHandler(), logging.INFO, '[%(name)s] %(levelname)s: %(message)s')
+        logger.addHandler(active_log_handlers["stream"])
+    
+    if file:
+        if not active_log_handlers.get("file"):
+            active_log_handlers["file"] = makeLogHandler(logging.FileHandler("latest.log", mode="w"), logging.INFO, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+        logger.addHandler(active_log_handlers["file"])
+
+    if debug:
+        if not active_log_handlers.get("file_debug"):
+            active_log_handlers["file_debug"] = makeLogHandler(logging.FileHandler("latest_debug.log", mode="w"), logging.DEBUG, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+        logger.addHandler(active_log_handlers["file_debug"])
+
+    return logger
+
 
 class ContextPrinter():
 
