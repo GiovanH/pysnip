@@ -156,15 +156,16 @@ class ContentCanvas(tk.Canvas):
         #     traceback.print_exc()
         #     return False
 
-        self.configureForFile(filepath)
-
-        return True
+        return self.configureForFile(filepath)
 
     def configureForFile(self, filepath):
         text = "No selection."
 
         if not filepath:
             return
+
+        if not os.path.isfile(filepath):
+            return False
 
         (filename_, fileext) = os.path.splitext(filepath)
         if fileext.lower() in _IMAGEEXTS or fileext.lower() in _VIDEOEXTS:
@@ -176,6 +177,7 @@ class ContentCanvas(tk.Canvas):
             self.itemconfig(self.text, text=text, state="normal")
             self.itemconfig(self.photoimage, image="", state="hidden")
             self.curimg = None
+        return True
 
     def preloadImage(self, filepaths):
         if len(filepaths) > 20:

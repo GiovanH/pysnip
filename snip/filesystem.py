@@ -6,6 +6,15 @@ import sys
 
 class Trash(object):
 
+    """Acts as a proxy for deleting files.
+    Allows quick undos by delaying filesystem commits.
+    
+    Attributes:
+        queue_size (TYPE): Maximum length of the trash queue before committing disk operations
+        trash_queue (list): List of files to be deleted
+        verbose (bool): Print verbose output
+    """
+    
     def __init__(self, queue_size=20, verbose=False):
         super().__init__()
 
@@ -22,7 +31,7 @@ class Trash(object):
             print("send2trash unavailible, using unsafe delete", file=sys.stderr)
             self._osTrash = os.unlink
 
-        self.spool = Spool(8, "os trash")
+        self._spool = Spool(8, "os trash")
 
     def __enter__(self):
         return self
@@ -44,7 +53,7 @@ class Trash(object):
             return os.path.isfile(path)
 
     def commitDelete(self, path):
-        self.spool.enqueue(self._osTrash, args=(path,))
+        self._spool.enqueue(self._osTrash, args=(path,))
         
         if self.verbose:
             print("{} --> {} --> {}".format("[SNIPTRASH]", path, "[OS TRASH]"))
@@ -80,7 +89,7 @@ class Trash(object):
     def finish(self):
         for path in self.trash_queue.copy():
             self.commitDelete(path)
-        self.spool.finish()
+        self._spool.finish()
 
 
 

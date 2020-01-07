@@ -5,9 +5,11 @@ from snip.loom import Spool
 
 print('good day and welcome to tests')
 
-def dowork(work, i):
+def dowork(work, i, say=None):
     time.sleep(1)
     work.append(i)
+    if say:
+        print(say)
 
 class TestData(object):
 
@@ -30,33 +32,14 @@ class TestData(object):
 
         assert len(work) == max
 
-    def test_purge(self):
+    def test_print(self):
+        with Spool(8, "print") as spool:
+            for i in range(0, 20):
+                spool.enqueue(dowork, ([], 1, f"Saying {i}"))
 
-        import snip.jfileutil as ju
-
-        default = { k: k for k in range(0, 2000) }
-
-        print("Removing dead hashes")
-
-        def _pruneKey(dictionary, key):
-            return 1
-            # if purge:
-            #     for p in dictionary[key]:
-            #         if (p not in keeppaths) or (not os.path.isfile(p)):
-            #             dictionary[key].remove(p)
-            #             print("Removed path ", p)
-            # if len(dictionary[key]) == 0:
-            #     dictionary.pop(key)
-            #     print("Removed hash ", key)
-            # return
-
-        with ju.RotatingHandler("Test", basepath="databases", readonly=False, default=default) as jdb:
-            with Spool(1) as spool:
-                for key in list(jdb.keys()):
-                    spool.enqueue(_pruneKey, (jdb, key,))
 
 
 if __name__ == '__main__':
+    TestData().test_print()
     TestData().test_fast()
     TestData().test_slow()
-    TestData().test_purge()
