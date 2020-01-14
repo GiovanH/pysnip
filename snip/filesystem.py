@@ -101,14 +101,12 @@ class Trash(object):
         self._spool.finish()
 
 
-
-
 def easySlug(string, repl="-", directory=False):
     import re
     if directory:
-        return re.sub("^\.|\.+$", "", easySlug(string, directory=False))
+        return re.sub("^\.|\.+$", "", easySlug(string, repl=repl, directory=False))
     else:
-        return re.sub("[\\\\/:*?\"<>\|]|\ $", repl, string)
+        return re.sub(r"[\\\\/:*?\"<>|\t]|\ +$", repl, string)
 
 
 def userProfile(subdir=""):
