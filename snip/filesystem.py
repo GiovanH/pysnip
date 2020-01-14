@@ -2,6 +2,8 @@
 
 import os
 import sys
+import logging
+from .hash import CRC32file
 
 
 class Trash(object):
@@ -44,22 +46,28 @@ class Trash(object):
 
     def enforceQueueSize(self):
         while len(self.trash_queue) > self.queue_size:
-            self.commitDelete(self.trash_queue[0])
+            path, crc = self.trash_queue[0]
+            self.commitDelete(path, crc)
 
     def isfile(self, path):
-        if path in self.trash_queue:
+        if path in [t[0] for t in self.trash_queue]:
             return False
         else:
             return os.path.isfile(path)
 
-    def commitDelete(self, path):
+    def commitDelete(self, path, crc):
+        if not CRC32file(path) == crc:
+            print("Warning! File changed. Not deleting file '%s'" % path)
+            return
+
         self._spool.enqueue(self._osTrash, args=(path,))
         
         if self.verbose:
-            print("{} --> {} --> {}".format("[SNIPTRASH]", path, "[OS TRASH]"))
+            print("{} --> {} ({}) --> {}".format("[SNIPTRASH]", path, crc, "[OS TRASH]"))
 
-        if path in self.trash_queue:
-            self.trash_queue.remove(path)
+        tup = (path, crc)
+        if tup in self.trash_queue:
+            self.trash_queue.remove(tup)
         else:
             print(f"warning: deleted file '{path}' not in trash!", file=sys.stderr)
 
@@ -71,9 +79,10 @@ class Trash(object):
             print(f"warning: attempted to delete non-existent file '{path}'", file=sys.stderr)
             return False
 
-        self.trash_queue.append(path)
+        crc = CRC32file(path)
+        self.trash_queue.append((path, crc,))
         if self.verbose:
-            print("{} --> {}".format(path, "[SNIPTRASH]"))
+            print("{} ({}) --> {}".format(path, crc, "[SNIPTRASH]"))
         self.enforceQueueSize()
         return True
 
@@ -87,8 +96,8 @@ class Trash(object):
             return False
 
     def finish(self):
-        for path in self.trash_queue.copy():
-            self.commitDelete(path)
+        for path, crc in self.trash_queue.copy():
+            self.commitDelete(path, crc)
         self._spool.finish()
 
 
