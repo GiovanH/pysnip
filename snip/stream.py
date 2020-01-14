@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from string import Formatter
+from sys import argv
 
 from .strings import timestamp
 
@@ -11,7 +12,7 @@ import logging
 def makeLogHandler(base, level, format_string):
     h = base
     h.setLevel(level)  
-    h.setFormatter(logging.Formatter(format_string))
+    h.setFormatter(logging.Formatter(format_string, "%Y-%m-%d %H:%M:%S"))
     return h
 
 
@@ -31,12 +32,12 @@ def TriadLogger(__name, stream=True, file=True, debug=True):
     
     if file:
         if not active_log_handlers.get("file"):
-            active_log_handlers["file"] = makeLogHandler(logging.FileHandler("latest.log", mode="w"), logging.INFO, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+            active_log_handlers["file"] = makeLogHandler(logging.FileHandler(f"{argv[0]}_latest.log", mode="w"), logging.INFO, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
         logger.addHandler(active_log_handlers["file"])
 
     if debug:
         if not active_log_handlers.get("file_debug"):
-            active_log_handlers["file_debug"] = makeLogHandler(logging.FileHandler("latest_debug.log", mode="w"), logging.DEBUG, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+            active_log_handlers["file_debug"] = makeLogHandler(logging.FileHandler(f"{argv[0]}_latest_debug.log", mode="w", encoding="utf-8"), logging.DEBUG, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
         logger.addHandler(active_log_handlers["file_debug"])
 
     return logger
