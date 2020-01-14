@@ -6,6 +6,7 @@ import snip.image
 import snip.strings
 from PIL import Image
 from PIL import ImageDraw
+from PIL import ImageFont
 from PIL import ImageTk
 from math import floor
 import cv2
@@ -302,6 +303,7 @@ class ContentCanvas(tk.Canvas):
             self.after(200, self.makePhotoImage, filename, ALWAYS_RESIZE, stepsize)
             return None
 
+        # Attempt cache fetch
         pilimg = self.photoImageCache.get(filename)
 
         if pilimg:
@@ -310,6 +312,7 @@ class ContentCanvas(tk.Canvas):
         (filename_, fileext) = os.path.splitext(filename)
         canResize = True
 
+        # Get initial image
         try:
             if fileext.lower() in _IMAGEEXTS:
                 pilimg = Image.open(filename)
@@ -326,6 +329,7 @@ class ContentCanvas(tk.Canvas):
         except (cv2.error, OSError,):
             pilimg = self.placeholderImage()
 
+        # Resize image to canvas
         imageIsTooBig = pilimg.width > maxwidth or pilimg.height > maxheight
         if (imageIsTooBig and canResize) or ALWAYS_RESIZE:
             ratio = min(maxwidth / pilimg.width, maxheight / pilimg.height)
@@ -357,13 +361,21 @@ class ContentCanvas(tk.Canvas):
                     print("Corrupt image, I think?")
                     print(filename)
                     messagebox.showwarning("Bad image", traceback.format_exc())
-                    self.filepaths.remove(filename)
-                    self.imageUpdate()
+                    pilimg = self.placeholderImage()
                 except Exception:
                     raise
+        
+        # Add overlay to video files
+        if fileext.lower() in _VIDEOEXTS:
+            ImageDraw.Draw(pilimg).rectangle([(0, 0), (30, 14)], fill=(0, 0, 0))
+            ImageDraw.Draw(pilimg).text((2, 2), fileext.lower(), fill=(255, 255, 255))
 
-            self.photoImageCache[filename] = pilimg
-            loom.thread(target=self.pruneImageCache, name="pruneImageCache")
+        if (fileext.lower() in _IMAGEEXTS and snip.image.framesInImage(filename) > 1):
+            ImageDraw.Draw(pilimg).rectangle([(0, 0), (30, 14)], fill=(0, 0, 0))
+            ImageDraw.Draw(pilimg).text((2, 2), str(snip.image.framesInImage(filename)), fill=(255, 255, 255))
+
+        self.photoImageCache[filename] = pilimg
+        loom.thread(target=self.pruneImageCache, name="pruneImageCache")
         return ImageTk.PhotoImage(pilimg)
 
     def pruneImageCache(self, max_memory_entries=30):
