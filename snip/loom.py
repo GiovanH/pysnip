@@ -63,7 +63,10 @@ class Spool():
         return self
 
     def __exit__(self, type, value, traceback):
-        self.finish(resume=False, **self.cfinish)
+        try:
+            self.finish(resume=False, **self.cfinish)
+        except KeyboardInterrupt:
+            raise
 
     def __str__(self):
         return f"{type(self)} at {hex(id(self))}: {self.numRunningThreads}/{self.quota} threads running with {len(self.queue)} queued."
@@ -178,6 +181,7 @@ class Spool():
             try:
                 target(*args, **kwargs)
             except Exception:
+                print("Aborting spooled thread", file=sys.stderr)
                 traceback.print_exc()
             finally:
                 self.dirty.set()
