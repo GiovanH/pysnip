@@ -16,7 +16,9 @@ from threading import Lock
 from tkinter import filedialog
 import subprocess
 import datetime
-import win32clipboard
+
+from snip.stream import TriadLogger
+logger = TriadLogger(__name__)
 
 IMAGEEXTS = ["png", "jpg", "gif", "bmp", "jpeg", "tif", "gifv", "jfif"]
 VIDEOEXTS = ["webm", "mp4", "mov", "webp"]
@@ -25,6 +27,7 @@ _VIDEOEXTS = ["." + e for e in VIDEOEXTS]
 
 
 def send_to_clipboard(clip_type, data):
+    import win32clipboard
     win32clipboard.OpenClipboard()
     win32clipboard.EmptyClipboard()
     win32clipboard.SetClipboardData(clip_type, data)
@@ -46,6 +49,7 @@ def copy_imdata_to_clipboard(filepath):
 
 
 def copy_text_to_clipboard(text):
+    import win32clipboard
     win32clipboard.OpenClipboard()
     win32clipboard.EmptyClipboard()
     win32clipboard.SetClipboardText(text, win32clipboard.CF_TEXT)
@@ -87,8 +91,12 @@ class ContentCanvas(tk.Canvas):
 
         # create a menu
         popup = tk.Menu(self, tearoff=0)
-        popup.add_command(label="Copy image", command=lambda: copy_imdata_to_clipboard(self.current_file))  # , command=next) etc...
-        popup.add_command(label="Copy path", command=lambda: copy_text_to_clipboard(self.current_file))  # , command=next) etc...
+        try:
+            import win32clipboard
+            popup.add_command(label="Copy image", command=lambda: copy_imdata_to_clipboard(self.current_file))  # , command=next) etc...
+            popup.add_command(label="Copy path", command=lambda: copy_text_to_clipboard(self.current_file))  # , command=next) etc...
+        except ImportError:
+            logger.error("Clipboard support not available.")
         popup.add_separator()
         popup.add_command(label="Open", command=lambda: os.startfile(self.current_file))
         popup.add_command(label="Open file location", command=self.open_file_location)
