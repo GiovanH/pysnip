@@ -117,41 +117,43 @@ class Spool():
 
         self._pbar_max = self.numRunningThreads + len(self.queue)
 
-        try:
-            if use_pbar:
-                orig_out_err = sys.stdout, sys.stderr
-                sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
-                self.progbar = progbar = tqdm.tqdm(
-                    file=orig_out_err[0], dynamic_ncols=True,
-                    desc=self.name,
-                    total=self._pbar_max,
-                    unit="job"
-                )
+        if self._pbar_max > 0:
 
-                updateProgressBar()
-            # assert not self.spoolThread.isAlive, "Background loop did not terminate"
-            # Create a spoolloop, but block until it deploys all threads.
-            while (self.queue and len(self.queue) > 0) or (self.numRunningThreads > 0):
-                self.dirty.wait()
-                threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
-                if verbose:
-                    print(self)
-                for i in range(threads_to_queue):
-                    try:
-                        self.startThread(self.queue.pop(0))
-                    except IndexError:
-                        print(f"IndexError: Popped from empty queue?\nWhile queueing thread {i} of {threads_to_queue}\n{len(self.queue)}-{self.quota}-{self.numRunningThreads}")
+            try:
                 if use_pbar:
-                    updateProgressBar()
-                self.dirty.set()
-            updateProgressBar()
+                    orig_out_err = sys.stdout, sys.stderr
+                    sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
+                    self.progbar = progbar = tqdm.tqdm(
+                        file=orig_out_err[0], dynamic_ncols=True,
+                        desc=self.name,
+                        total=self._pbar_max,
+                        unit="job"
+                    )
 
-            assert len(self.queue) == 0, "Finished without deploying all threads"
-            assert self.numRunningThreads == 0, "Finished without finishing all threads"
-        finally:
-            if use_pbar:
-                progbar.close()
-                sys.stdout, sys.stderr = orig_out_err
+                    updateProgressBar()
+                # assert not self.spoolThread.isAlive, "Background loop did not terminate"
+                # Create a spoolloop, but block until it deploys all threads.
+                while (self.queue and len(self.queue) > 0) or (self.numRunningThreads > 0):
+                    self.dirty.wait()
+                    threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
+                    if verbose:
+                        print(self)
+                    for i in range(threads_to_queue):
+                        try:
+                            self.startThread(self.queue.pop(0))
+                        except IndexError:
+                            print(f"IndexError: Popped from empty queue?\nWhile queueing thread {i} of {threads_to_queue}\n{len(self.queue)}-{self.quota}-{self.numRunningThreads}")
+                    if use_pbar:
+                        updateProgressBar()
+                    self.dirty.set()
+                updateProgressBar()
+
+                assert len(self.queue) == 0, "Finished without deploying all threads"
+                assert self.numRunningThreads == 0, "Finished without finishing all threads"
+            finally:
+                if use_pbar:
+                    progbar.close()
+                    sys.stdout, sys.stderr = orig_out_err
 
         if resume:
             self.queue.clear()  # Create a fresh queue
