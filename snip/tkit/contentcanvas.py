@@ -17,6 +17,9 @@ from tkinter import filedialog
 import subprocess
 import datetime
 import win32clipboard
+import zipfile
+import snip.filesystem
+
 
 IMAGEEXTS = ["png", "jpg", "gif", "bmp", "jpeg", "tif", "gifv", "jfif"]
 VIDEOEXTS = ["webm", "mp4", "mov", "webp"]
@@ -254,6 +257,10 @@ class ContentCanvas(tk.Canvas):
                 except Exception as e:
                     text += f"\npdfminer {type(e)}: {e}"
 
+            if fileext.lower() == ".zip":
+                with zipfile.ZipFile(filepath, 'r') as fp: 
+                    text += "\n" + "\n".join(fp.namelist())
+
             if os.name == "nt":
                 from snip.win32_fileprops import property_sets
                 for name, properties in property_sets(filepath):
@@ -329,6 +336,9 @@ class ContentCanvas(tk.Canvas):
         except (cv2.error, OSError,):
             pilimg = self.placeholderImage()
 
+        # For full support
+        pilimg = pilimg.convert('RGBA')
+
         # Resize image to canvas
         imageIsTooBig = pilimg.width > maxwidth or pilimg.height > maxheight
         if (imageIsTooBig and canResize) or ALWAYS_RESIZE:
@@ -366,13 +376,19 @@ class ContentCanvas(tk.Canvas):
                     raise
         
         # Add overlay to video files
-        if fileext.lower() in _VIDEOEXTS:
-            ImageDraw.Draw(pilimg).rectangle([(0, 0), (30, 14)], fill=(0, 0, 0))
-            ImageDraw.Draw(pilimg).text((2, 2), fileext.lower(), fill=(255, 255, 255))
+        pilimg_bak = pilimg
+        try:
+            if fileext.lower() in _VIDEOEXTS:
+                ImageDraw.Draw(pilimg).rectangle([(0, 0), (30, 14)], fill=(0, 0, 0))
+                ImageDraw.Draw(pilimg).text((2, 2), fileext.lower(), fill=(255, 255, 255))
 
-        if (fileext.lower() in _IMAGEEXTS and snip.image.framesInImage(filename) > 1):
-            ImageDraw.Draw(pilimg).rectangle([(0, 0), (30, 14)], fill=(0, 0, 0))
-            ImageDraw.Draw(pilimg).text((2, 2), str(snip.image.framesInImage(filename)), fill=(255, 255, 255))
+            if (fileext.lower() in _IMAGEEXTS and snip.image.framesInImage(filename) > 1):
+                ImageDraw.Draw(pilimg).rectangle([(0, 0), (30, 14)], fill=(0, 0, 0))
+                ImageDraw.Draw(pilimg).text((2, 2), str(snip.image.framesInImage(filename)), fill=(255, 255, 255))
+        except ValueError:
+            import traceback
+            traceback.print_exc()
+            pilimg = pilimg
 
         self.photoImageCache[filename] = pilimg
         loom.thread(target=self.pruneImageCache, name="pruneImageCache")
