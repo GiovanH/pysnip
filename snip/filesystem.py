@@ -56,6 +56,7 @@ class Trash(object):
             return os.path.isfile(path)
 
     def commitDelete(self, path, crc):
+        tup = (path, crc)
         if os.path.isfile(path):
             if not CRC32file(path) == crc:
                 print("Warning! File changed. Not deleting file '%s'" % path)
@@ -66,13 +67,13 @@ class Trash(object):
             if self.verbose:
                 print("{} --> {} ({}) --> {}".format("[SNIPTRASH]", path, crc, "[OS TRASH]"))
 
-            tup = (path, crc)
-            if tup in self.trash_queue:
-                self.trash_queue.remove(tup)
-            else:
-                print(f"warning: deleted file '{path}' not in trash!", file=sys.stderr)
         else:
             print(f"warning: deleted file '{path}' disappeared from disk", file=sys.stderr)
+        
+        if tup in self.trash_queue:
+            self.trash_queue.remove(tup)
+        else:
+            print(f"warning: deleted file '{path}' not in trash!", file=sys.stderr)
 
     def delete(self, path):
         if path in self.trash_queue:
