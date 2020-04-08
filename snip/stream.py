@@ -3,6 +3,8 @@
 from contextlib import contextmanager
 from string import Formatter
 from sys import argv
+import shutil
+import os
 
 from .strings import timestamp
 
@@ -25,6 +27,9 @@ def TriadLogger(__name, stream=True, file=True, debug=True):
     logger = logging.getLogger(__name)
     logger.setLevel(logging.DEBUG)
 
+    filepath_normal = f"{argv[0].replace('.py', '')}_latest.log"
+    filepath_debug = f"{argv[0].replace('.py', '')}_latest_debug.log"
+
     if stream:
         if not active_log_handlers.get("stream"):
             active_log_handlers["stream"] = makeLogHandler(logging.StreamHandler(), logging.INFO, '[%(name)s] %(levelname)s: %(message)s')
@@ -32,12 +37,16 @@ def TriadLogger(__name, stream=True, file=True, debug=True):
     
     if file:
         if not active_log_handlers.get("file"):
-            active_log_handlers["file"] = makeLogHandler(logging.FileHandler(f"{argv[0]}_latest.log", mode="w"), logging.INFO, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+            if os.path.isfile(filepath_normal):
+                shutil.move(filepath_normal, filepath_normal + ".bak")
+            active_log_handlers["file"] = makeLogHandler(logging.FileHandler(filepath_normal, mode="w"), logging.INFO, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
         logger.addHandler(active_log_handlers["file"])
 
     if debug:
         if not active_log_handlers.get("file_debug"):
-            active_log_handlers["file_debug"] = makeLogHandler(logging.FileHandler(f"{argv[0]}_latest_debug.log", mode="w", encoding="utf-8"), logging.DEBUG, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+            if os.path.isfile(filepath_debug):
+                shutil.move(filepath_debug, filepath_debug + ".bak")
+            active_log_handlers["file_debug"] = makeLogHandler(logging.FileHandler(filepath_debug, mode="w", encoding="utf-8"), logging.DEBUG, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
         logger.addHandler(active_log_handlers["file_debug"])
 
     return logger
