@@ -65,7 +65,6 @@ def saveStreamAs(stream, dest_path, nc=False, verbose=False):
         bool: Success
     """
     from os import path, stat
-    from math import inf
 
     stream_length = float(stream.headers.get("Content-Length", -1))
     if path.isfile(dest_path):
