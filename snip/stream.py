@@ -21,35 +21,47 @@ def makeLogHandler(base, level, format_string):
 active_log_handlers = {}
 
 
-def TriadLogger(__name, stream=True, file=True, debug=True):
+def TriadLogger(__name, stream=True, file=True, debug=True, retries=0):
     global active_log_handlers
     
     logger = logging.getLogger(__name)
     logger.setLevel(logging.DEBUG)
 
-    filepath_normal = f"{argv[0].replace('.py', '')}_latest.log"
-    filepath_debug = f"{argv[0].replace('.py', '')}_latest_debug.log"
+    progname = argv[0].replace('.py', '')
+    if retries > 0:
+        if retries > 20:
+            raise Exception("Cannot open logfile! Too many instances open?")
+        progname = f"{progname}{retries}"
 
-    if stream:
-        if not active_log_handlers.get("stream"):
-            active_log_handlers["stream"] = makeLogHandler(logging.StreamHandler(), logging.INFO, '[%(name)s] %(levelname)s: %(message)s')
-        logger.addHandler(active_log_handlers["stream"])
-    
-    if file:
-        if not active_log_handlers.get("file"):
-            if os.path.isfile(filepath_normal):
-                shutil.move(filepath_normal, filepath_normal + ".bak")
-            active_log_handlers["file"] = makeLogHandler(logging.FileHandler(filepath_normal, mode="w"), logging.INFO, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-        logger.addHandler(active_log_handlers["file"])
+    filepath_normal = f"{progname}_latest.log"
+    filepath_debug = f"{progname}_latest_debug.log"
 
-    if debug:
-        if not active_log_handlers.get("file_debug"):
-            if os.path.isfile(filepath_debug):
-                shutil.move(filepath_debug, filepath_debug + ".bak")
-            active_log_handlers["file_debug"] = makeLogHandler(logging.FileHandler(filepath_debug, mode="w", encoding="utf-8"), logging.DEBUG, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-        logger.addHandler(active_log_handlers["file_debug"])
+    try:
 
-    return logger
+        if stream:
+            if not active_log_handlers.get("stream"):
+                active_log_handlers["stream"] = makeLogHandler(logging.StreamHandler(), logging.INFO, '[%(name)s] %(levelname)s: %(message)s')
+            logger.addHandler(active_log_handlers["stream"])
+        
+        if file:
+            if not active_log_handlers.get("file"):
+                if os.path.isfile(filepath_normal):
+                    shutil.move(filepath_normal, filepath_normal + ".bak")
+                active_log_handlers["file"] = makeLogHandler(logging.FileHandler(filepath_normal, mode="w"), logging.INFO, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+            logger.addHandler(active_log_handlers["file"])
+
+        if debug:
+            if not active_log_handlers.get("file_debug"):
+                if os.path.isfile(filepath_debug):
+                    shutil.move(filepath_debug, filepath_debug + ".bak")
+                active_log_handlers["file_debug"] = makeLogHandler(logging.FileHandler(filepath_debug, mode="w", encoding="utf-8"), logging.DEBUG, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+            logger.addHandler(active_log_handlers["file_debug"])
+
+        return logger
+
+    except PermissionError:
+        print(f"'{filepath_normal}' is busy(?), incrementing")
+        return TriadLogger(__name, stream=stream, file=file, debug=debug, retries=(retries + 1))
 
 
 class ContextPrinter():
