@@ -12,6 +12,7 @@ import tqdm
 import traceback
 import contextlib
 import sys
+import asyncio
 from tqdm.contrib import DummyTqdmFile
 
 
@@ -258,5 +259,161 @@ class ThreadSpool():
             # threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
 
         self.dirty.clear()
+
+
+
+class AIOSpool():
+
+    """A spool is a queue of threads.
+    This is a simple way of making sure you aren't running too many threads at one time.
+    At intervals, determined by `delay`, the spooler (if on) will start threads from the queue.
+    The spooler can start multiple threads at once.
+
+    You can .print to this object, and it will intelligently print the arguments
+    based on whether or not it's using a progress bar.
+    """
+
+    def __init__(self, jobs=[], name="AIOSpool", use_progbar=True):
+        """Create a spool
+
+        Args:
+            quota (int): Size of quota, i.e. how many threads can run at once.
+            cfinish (dict, optional): Description
+        """
+        self.name = name
+        self.use_progbar = use_progbar
+
+        self.started_threads = []
+
+        self._pbar_max = 0
+
+        self.nop = (lambda: None)
+        self.on_finish_callback = self.nop
+
+        if type(jobs) == int:
+            import warnings
+            warnings.warn("Jobs should be iterable, not an int! You're using queue syntax!")
+            jobs = []
+
+        for job in jobs:
+            self.enqueue(job)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, type, value, traceback):
+        try:
+            return await self.finish(resume=False)
+        except KeyboardInterrupt:
+            raise
+
+    def __str__(self):
+        return f"{type(self)} at {hex(id(self))}: {self.numActiveJobs} active jobs."
+
+    # Interfaces
+
+    def print(self, *args, **kwargs):
+        if self.progbar:
+            self.progbar.write(
+                kwargs.get("sep", " ").join(args)
+            )
+        else:
+            print(*args, **kwargs)
+
+    async def finish(self, resume=False, verbose=False, use_pbar=None):
+        """Block and complete all threads in queue.
+        
+        Args:
+            resume (bool, optional): Resume spooling after finished
+            verbose (bool, optional): Report progress towards queue completion.
+            use_pbar (bool, optional): Graphically display progress towards queue completions
+        """
+        if use_pbar is None:
+            use_pbar = self.use_progbar
+
+        if verbose:
+            print(self)
+
+        # Progress bar management, optional.
+        def updateProgressBar():
+            # Update progress bar.
+            if use_pbar:
+                progress = (self._pbar_max - self.numActiveJobs)
+
+                progbar.total = self._pbar_max
+                progbar.n = progress
+                progbar.set_postfix(waiting=f"{self.numActiveJobs:2}]")
+                progbar.update(0)
+
+        self._pbar_max = len([j for j in self.started_threads if not j.done()])
+
+        if self._pbar_max > 0:
+            try:
+                if use_pbar:
+                    orig_out_err = sys.stdout, sys.stderr
+                    sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
+                    self.progbar = progbar = tqdm.tqdm(
+                        file=orig_out_err[0], dynamic_ncols=True,
+                        desc=self.name,
+                        total=self._pbar_max,
+                        unit="job"
+                    )
+                    self.on_finish_callback = updateProgressBar
+
+                    updateProgressBar()
+
+                await asyncio.gather(*self.started_threads)
+                updateProgressBar()
+
+                assert self.numActiveJobs == 0, "Finished without finishing all threads"
+            finally:
+                if use_pbar:
+                    progbar.close()
+                    sys.stdout, sys.stderr = orig_out_err
+
+        if verbose:
+            print(self)
+
+        self.on_finish_callback = self.nop
+
+    def enqueue(self, target):
+        """Add a thread to the back of the queue.
+
+        Args:
+            target (function): The function to execute
+            name (str): Name of thread, for debugging purposes
+            args (tuple, optional): Description
+            kwargs (dict, optional): Description
+
+            *thargs: Args for threading.Thread
+            **thkwargs: Kwargs for threading.Thread
+        """
+        async def runAndFlag():
+            try:
+                await target
+                self.on_finish_callback()
+            except Exception:
+                print("Aborting spooled job", file=sys.stderr)
+                traceback.print_exc()
+        self.started_threads.append(asyncio.ensure_future(runAndFlag()))
+        self._pbar_max += 1
+
+    ##################
+    # Minor utility
+    ##################
+
+    @property
+    def numActiveJobs(self):
+        """Accurately count number of "our" running threads.
+
+        Returns:
+            int: Number of running threads owned by this spool
+        """
+        return len([
+            thread
+            for thread in self.started_threads
+            if not thread.done()
+        ])
+
 
 Spool = ThreadSpool
