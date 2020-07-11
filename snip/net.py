@@ -158,10 +158,14 @@ def _saveChunked(path, response):
         path (str): 
         response (response): 
     """
-    with open(path, 'wb') as file:
-        for chunk in response:
-            file.write(chunk)
-
+    try:
+        with open(path, 'wb') as file:
+            for chunk in response:
+                file.write(chunk)
+    except OSError:
+        # Clean up partial file
+        os.unlink(path)
+        raise
 
 def mirrorUrl(url, dest_directory, nc=False, slug=easySlug):
     return mirror(getStream(url), dest_directory, nc=nc, slug=slug)
