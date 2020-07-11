@@ -1,24 +1,22 @@
 import tkinter as tk
-import traceback
-from snip import loom
-import snip.math
 import snip.image
+import snip.math
 import snip.strings
+
 from PIL import Image
 from PIL import ImageDraw
-from PIL import ImageFont
+from snip import loom
 from PIL import ImageTk
-from math import floor
 import cv2
-from tkinter import messagebox
+
 import os
+import subprocess
 from threading import Lock
 from tkinter import filedialog
-import subprocess
-import datetime
-import win32clipboard
-import zipfile
+import collections
+import math
 import snip.filesystem
+import zipfile
 
 
 from snip.stream import TriadLogger
@@ -41,6 +39,7 @@ def send_to_clipboard(clip_type, data):
 def copy_imdata_to_clipboard(filepath):
     from io import BytesIO
     from PIL import Image
+    import win32clipboard
 
     image = Image.open(filepath)
 
@@ -65,11 +64,12 @@ class ContentCanvas(tk.Canvas):
         """Args:
             parent (tk): Tk parent widget
             *args: Passthrough
-            **kwargs: PassthroughphotoImageCache.pop
+            **kwargs: Passthrough
         """
         tk.Canvas.__init__(self, *args, **kwargs)
 
-        self.photoImageCache = {}
+        self.photoImageCaches = collections.defaultdict(dict)
+        self.photoImageCache = self.photoImageCaches[(0, 0)]
         self.textCache = {}
 
         self.preloaderLock = Lock()
@@ -77,11 +77,14 @@ class ContentCanvas(tk.Canvas):
 
         self.current_file = ""
 
+        self.resize_after = None
+
         # Initialize window
         self.initwindow()
 
     def destroy(self):
-        self.spool.finish()
+        # self.spool.finish()
+        self.spool.cancel()
         super().destroy()
 
     def initwindow(self):
@@ -138,27 +141,43 @@ class ContentCanvas(tk.Canvas):
         snip.filesystem.copyFileToDir(self.current_file, downloads)
         self.bell()
 
-    def onResize(self, *args):
+    def onResize(self, configure_event):
         # self.markAllDirty()
         # We don't need to mark text dirty
-        self.photoImageCache.clear()
-        self.setFile(self.current_file)
+        # logger.debug("Clearing photoimage cache (window resized)")
+        # self.photoImageCache.clear()
+        def _resizeafter_callback():
+            dimensions = (self.winfo_width(), self.winfo_height())
+            self.photoImageCache = self.photoImageCaches[dimensions]
+            logger.debug(f"Switching to cache for size {dimensions}")
+            self.setFile(self.current_file)
+            # If this was done after a resize, cancel that biz.
+            self.resize_after = None
+
+        if self.current_file:
+            if self.resize_after:
+                self.after_cancel(self.resize_after)
+            self.resize_after = self.after(100, _resizeafter_callback)
 
     def markCacheDirty(self, entry):
+        logger.debug(f"Removing dirtied cache item {entry}")
         self.photoImageCache.pop(entry, None)
         self.textCache.pop(entry, None)
 
     def markAllDirty(self):
+        logger.debug("Clearing photoimage cache (all dirty)")
         self.photoImageCache.clear()
         self.textCache.clear()
 
     def clear(self):
         self.itemconfig(self.photoimage, image=None)
         self.itemconfig(self.photoimage, state="hidden")
+        self.itemconfig(self.text, text=None, state="hidden")
 
     def setFile(self, filepath):
         """Update the display to match the current image index.
         """
+
 
         self.current_file = os.path.normpath(filepath)
 
@@ -172,6 +191,7 @@ class ContentCanvas(tk.Canvas):
         return self.configureForFile(filepath)
 
     def configureForFile(self, filepath):
+        logger.debug(f"Configuring canvas for new filepath '{filepath}'")
         text = "No selection."
 
         if not filepath:
@@ -207,27 +227,6 @@ class ContentCanvas(tk.Canvas):
                         )
                     )
                 self.after_idle(_do)
-        # return
-        # with self.preloaderLock:
-        #     with loom.Spool(6, cfinish=dict(use_pbar=False)) as spool:
-        #         try:
-        #             for filepath in filepaths:
-        #                 if filepath not in self.photoImageCache.keys():
-        #                     print("caching", filepath)
-        #                     spool.enqueue(
-        #                         target=self.makePhotoImage,
-        #                         args=(
-        #                             filepath,
-        #                             self.winfo_width(),
-        #                             self.winfo_height(),
-        #                         )
-        #                     )
-        #         except (MemoryError, tk.TclError, ZeroDivisionError):
-        #             print(self.photoImageCache)
-        #             print(hex(id(self.photoImageCache)))
-        #             print(len(self.photoImageCache))
-        #             self.photoImageCache.clear()
-        #             raise
 
     def makeTextData(self, filepath):
         text = self.textCache.get(filepath, "")
@@ -238,49 +237,50 @@ class ContentCanvas(tk.Canvas):
             filename, fileext = os.path.splitext(filepath)
             if fileext.lower() == ".pdf":
                 try:
-                    from pdfminer.pdfparser import PDFParser
-                    from pdfminer.pdfdocument import PDFDocument
+                    # from pdfminer.pdfparser import PDFParser
+                    # from pdfminer.pdfdocument import PDFDocument
 
-                    def decodePdfVal(value):
-                        try:
-                            # if value.startswith(b"D:"):
-                            # Handle dates?
-                            # PDF standard is D:YYYYMMDDHHmmSSOHH'mm'
+                    # def decodePdfVal(value):
+                    #     try:
+                    #         if "decode" in dir(value):
+                    #             return value.decode(errors="replace")
+                    #         elif "resolve" in dir(value):
+                    #             return value.resolve().decode(errors="replace")
+                    #     except Exception as e:
+                    #         print(e)
+                    #         return value
+                    import pikepdf
 
-                            return value.decode(errors="replace")
-                        except Exception as e:
-                            print(e)
-                            return value
-
-                    with open(filepath, "rb") as fp:
-                        parser = PDFParser(fp)
-                        doc = PDFDocument(parser)
-
-                        for infoblock in doc.info:
-                            print(infoblock)
-                            for key, value in infoblock.items():
-                                text += f"\n{key}:\t{decodePdfVal(value)}"
+                    with pikepdf.open(filepath) as pdf:
+                        for key, value in pdf.docinfo.items():
+                            try:
+                                text += f"\n{key}:\t{value}"
+                            except NotImplementedError:
+                                text += f"\n{key}:\t{value!r}"
 
                 except ImportError:
-                    text += f"\nImportError: pdfminer not installed"
+                    text += f"\nImportError: pikepdf not installed"
                 except Exception as e:
-                    text += f"\npdfminer {type(e)}: {e}"
+                    text += f"\npikepdf {type(e)}: {e}"
 
             if fileext.lower() == ".zip":
                 with zipfile.ZipFile(filepath, 'r') as fp: 
                     text += "\n" + "\n".join(fp.namelist())
 
             if os.name == "nt":
-                from snip.win32_fileprops import property_sets
-                for name, properties in property_sets(filepath):
-                    text += f"\nWin32 {name}"
-                    for key, value in properties.items():
-                        if value:
-                            text += f"\n\t{key}:\t{value}"
+                try:
+                    from snip.win32_fileprops import property_sets
+                    for name, properties in property_sets(filepath):
+                        text += f"\nWin32 {name}"
+                        for key, value in properties.items():
+                            if value:
+                                text += f"\n\t{key}:\t{value}"
+                except ImportError as e:
+                    text += f"\n{e}"
 
             try:
                 with open(filepath, "r") as fp:
-                    text += f"\n{fp.read(800000)}"
+                    text += f"\n{fp.read(5000)}"  # 5 kb
             except Exception as e:
                 print(e)
                 pass
@@ -317,16 +317,17 @@ class ContentCanvas(tk.Canvas):
         # Let window load
         if maxwidth <= 1 or maxheight <= 1:
             self.after(200, self.makePhotoImage, filename, ALWAYS_RESIZE, stepsize)
+            logger.debug("Window not initialized, waiting")
             return None
 
         # Attempt cache fetch
         pilimg = self.photoImageCache.get(filename)
 
         if pilimg:
+            logger.debug(f"photoimage cache hit for filename '{filename}'")
             return ImageTk.PhotoImage(pilimg)
 
         (filename_, fileext) = os.path.splitext(filename)
-        canResize = True
 
         # Get initial image
         try:
@@ -349,24 +350,25 @@ class ContentCanvas(tk.Canvas):
         pilimg = pilimg.convert('RGBA')
 
         # Resize image to canvas
-        imageIsTooBig = pilimg.width > maxwidth or pilimg.height > maxheight
-        if (imageIsTooBig and canResize) or ALWAYS_RESIZE:
+        ratio = 1.0
+        imageIsTooBig = (pilimg.width > maxwidth) or (pilimg.height > maxheight)
+        if imageIsTooBig:
             ratio = min(maxwidth / pilimg.width, maxheight / pilimg.height)
             method = Image.ANTIALIAS
-
-            if not imageIsTooBig:
-                stepratio = floor(ratio * stepsize) / stepsize
-                if stepratio != 0:
-                    ratio = stepratio
-                    method = Image.LINEAR
-                # else:
-                #     print("Warning: stepratio =", stepratio, "with ratio", ratio, "and stepsize", stepsize)
+        else:
+            ratio = min(maxwidth / pilimg.width, maxheight / pilimg.height)
+            ratio = math.floor(ratio * 4) / 4
+            method = Image.LINEAR
+            # else:
+            #     print("Warning: stepratio =", stepratio, "with ratio", ratio, "and stepsize", stepsize)
+        if ratio != 1.0 and ratio > 0:
+            logger.debug(f"Resizing {filename} to {ratio}x using method {method}")
             try:
                 # print(f"Resize: mw{maxwidth}, mh{maxheight}, w{pilimg.width}, h{pilimg.height}, ratio {ratio}, method {method}, stepsize {stepsize}\n{filename}")
                 pilimg = pilimg.resize(
                     (int(pilimg.width * ratio), int(pilimg.height * ratio)), method)
             except (OSError, ValueError):
-                print("OS error resizing file", filename)
+                logger.error(f"OS error resizing file {filename}", exc_info=True)
                 # raise
                 # loc = None
                 # for loc in locals():
@@ -374,15 +376,16 @@ class ContentCanvas(tk.Canvas):
                 try:
                     return ImageTk.PhotoImage(pilimg)
                 except SyntaxError:
-                    print("Corrupt image")
+                    logger.error("Corrupt image", exc_info=True)
                     pilimg = self.placeholderImage()
                 except (MemoryError, tk.TclError):
-                    print("Corrupt image, I think?")
-                    print(filename)
-                    messagebox.showwarning("Bad image", traceback.format_exc())
+                    logger.error("Corrupt image, I think?", exc_info=True)
                     pilimg = self.placeholderImage()
                 except Exception:
+                    logger.error("Unhandled exception", exc_info=True)
                     raise
+        else:
+            logger.debug(f"NOT {filename} to {ratio}x using method {method} (bad ratio)")
         
         # Add overlay to video files
         pilimg_bak = pilimg
@@ -397,13 +400,23 @@ class ContentCanvas(tk.Canvas):
         except ValueError:
             import traceback
             traceback.print_exc()
-            pilimg = pilimg
+            # pilimg = pilimg
 
         self.photoImageCache[filename] = pilimg
+        logger.debug("Adding new photoimage to cache")
+
         loom.thread(target=self.pruneImageCache, name="pruneImageCache")
         return ImageTk.PhotoImage(pilimg)
 
-    def pruneImageCache(self, max_memory_entries=30):
-        while len(self.photoImageCache) > max_memory_entries:
-            self.photoImageCache.pop(list(self.photoImageCache.keys())[0])
-        assert len(self.photoImageCache) <= max_memory_entries
+    def pruneImageCache(self, max_caches=6, max_memory_entries=100):
+        # while len(self.photoImageCaches) > max_caches:
+        #     bad_cache = list(self.photoImageCaches.keys())[0]
+        #     logger.info(f"Popping entire cache {bad_cache} ({len(self.photoImageCaches[bad_cache])} entries)")
+        #     self.photoImageCaches.pop(bad_cache)
+        for cache in self.photoImageCaches.values():
+            if len(cache) < max_memory_entries:
+                continue
+            while len(cache) > max_memory_entries // 2:
+                dirty_item = list(cache.keys())[0]
+                logger.info(f"Cache too big, removing entry {dirty_item}")
+                cache.pop(dirty_item)
