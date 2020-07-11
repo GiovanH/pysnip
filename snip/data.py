@@ -13,8 +13,7 @@ def chunk(it, size):
     """
     from itertools import islice
     iter_it = iter(it)
-    for chunk in iter(lambda: tuple(islice(iter_it, size)), ()):
-        yield chunk
+    yield from iter(lambda: tuple(islice(iter_it, size)), ())
 
 
 def flatList(lst):
