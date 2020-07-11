@@ -15,17 +15,18 @@ import sys
 from tqdm.contrib import DummyTqdmFile
 
 
-
-
-class Spool():
+class ThreadSpool():
 
     """A spool is a queue of threads.
     This is a simple way of making sure you aren't running too many threads at one time.
     At intervals, determined by `delay`, the spooler (if on) will start threads from the queue.
     The spooler can start multiple threads at once.
+
+    You can .print to this object, and it will intelligently print the arguments
+    based on whether or not it's using a progress bar.
     """
 
-    def __init__(self, quota, name="Spool", cfinish={}, belay=False):
+    def __init__(self, quota, name="Spool", belay=False, use_progbar=True):
         """Create a spool
 
         Args:
@@ -35,10 +36,10 @@ class Spool():
         super(Spool, self).__init__()
         self.quota = quota
         self.name = name
-        self.cfinish = cfinish
+        self.use_progbar = use_progbar
 
         self.queue = []
-        self.running_threads = []
+        self.started_threads = []
 
         self.flushing = 0
         self._pbar_max = 0
@@ -54,7 +55,7 @@ class Spool():
 
     def __exit__(self, type, value, traceback):
         try:
-            self.finish(resume=False, **self.cfinish)
+            self.finish(resume=False)
         except KeyboardInterrupt:
             raise
 
@@ -63,13 +64,13 @@ class Spool():
 
     # Interfaces
 
-    def print(self, *objs, **kwargs):
+    def print(self, *args, **kwargs):
         if self.progbar:
             self.progbar.write(
-                kwargs.get("sep", " ").join(objs)
+                kwargs.get("sep", " ").join(args)
             )
         else:
-            print(*objs, **kwargs)
+            print(*args, **kwargs)
 
     def start(self):
         """Begin spooling threads in the background, if not already doing so. 
@@ -79,7 +80,13 @@ class Spool():
             self.spoolThread = threading.Thread(target=self.spoolLoop, name="Spooler")
             self.spoolThread.start()
 
-    def finish(self, resume=False, verbose=False, use_pbar=True):
+    def cancel(self):
+        """Abort immeditately, potentially without finishing threads.
+        """
+        self.queue.clear()
+        self.finish()
+
+    def finish(self, resume=False, verbose=False, use_pbar=None):
         """Block and complete all threads in queue.
 
         Args:
@@ -87,6 +94,9 @@ class Spool():
             verbose (bool, optional): Report progress towards queue completion.
             use_pbar (bool, optional): Graphically display progress towards queue completions
         """
+        if use_pbar is None:
+            use_pbar = self.use_progbar
+
         # Stop existing spools
         self.background_spool = False
         self.dirty.set()
@@ -97,13 +107,14 @@ class Spool():
         # Progress bar management, optional.
         def updateProgressBar():
             # Update progress bar.
-            q = (len(self.queue) if self.queue else 0)
-            progress = (self._pbar_max - (self.numRunningThreads + q))
+            if use_pbar:
+                q = (len(self.queue) if self.queue else 0)
+                progress = (self._pbar_max - (self.numRunningThreads + q))
 
-            progbar.total = self._pbar_max
-            progbar.n = progress
-            progbar.set_postfix(queue=q, running=f"{self.numRunningThreads:2}/{self.quota}]")
-            progbar.update(0)
+                progbar.total = self._pbar_max
+                progbar.n = progress
+                progbar.set_postfix(queue=q, running=f"{self.numRunningThreads:2}/{self.quota}]")
+                progbar.update(0)
 
         self._pbar_max = self.numRunningThreads + len(self.queue)
 
@@ -125,16 +136,8 @@ class Spool():
                 # Create a spoolloop, but block until it deploys all threads.
                 while (self.queue and len(self.queue) > 0) or (self.numRunningThreads > 0):
                     self.dirty.wait()
-                    threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
-                    if verbose:
-                        print(self)
-                    for i in range(threads_to_queue):
-                        try:
-                            self.startThread(self.queue.pop(0))
-                        except IndexError:
-                            print(f"IndexError: Popped from empty queue?\nWhile queueing thread {i} of {threads_to_queue}\n{len(self.queue)}-{self.quota}-{self.numRunningThreads}")
-                    if use_pbar:
-                        updateProgressBar()
+                    self.doSpool(verbose=False)
+                    updateProgressBar()
                     self.dirty.set()
                 updateProgressBar()
 
@@ -185,43 +188,27 @@ class Spool():
         self.quota = newQuota
         self.dirty.set()
 
-    def enqueueSeries(self, targets):
-        """Queue a series of tasks that are interdepenent. 
-        Just a wrapper that creates a closure around functions, then queues them.
-
-        Args:
-            targets (list): A list of functions
-        """
-        def closure():
-            for target in targets:
-                target()
-            self.dirty.set()
-        self.queue.append(threading.Thread(target=closure))
-        self.dirty.set()
-
     ##################
     # Minor utility
     ##################
 
     def startThread(self, newThread):
-        self.running_threads.append(newThread)
+        self.started_threads.append(newThread)
         newThread.start()
         self.dirty.set()
 
     @property
     def numRunningThreads(self):
         """Accurately count number of "our" running threads.
-        This prunes dead threads and returns a count of live threads.
 
         Returns:
             int: Number of running threads owned by this spool
         """
-        self.running_threads = [
+        return len([
             thread
-            for thread in self.running_threads
+            for thread in self.started_threads
             if thread.is_alive()
-        ]
-        return len(self.running_threads)
+        ])
 
     ##################
     # Spooling
@@ -263,7 +250,13 @@ class Spool():
             if verbose:
                 print(self)
             # for i in range(threads_to_queue):
-            self.startThread(self.queue.pop(0))
+            try:
+                self.startThread(self.queue.pop(0))
+            except IndexError:
+                print(f"IndexError: Popped from empty queue?\nWhile queueing thread {len(self.queue)}-{self.quota}-{self.numRunningThreads}")
+                break
             # threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
 
         self.dirty.clear()
+
+Spool = ThreadSpool
