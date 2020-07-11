@@ -15,16 +15,6 @@ import sys
 from tqdm.contrib import DummyTqdmFile
 
 
-def thread(target, *args, **kwargs):
-    """Initialize and start a thread
-
-    Args:
-        target (function): Task to complete
-        *args: Passthrough to threading.Thread
-        **kwargs: threading.Thread
-    """
-    t = threading.Thread(target=target, *args, **kwargs)
-    t.start()
 
 
 class Spool():
