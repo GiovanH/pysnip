@@ -7,6 +7,7 @@ import bs4
 import os
 from .filesystem import easySlug
 
+OPTION_STRIPARGS = False
 
 def queryUrlToDict(url):
     from urllib.parse import urlparse, parse_qs
@@ -104,18 +105,30 @@ def getFilename(stream, indexHack=True, slug=easySlug):
             if filename:
                 return slug(urllib.parse.unquote(filename))
 
-    filename = slug(stream.url.split("/")[-1])
+    if OPTION_STRIPARGS:
+        filename = slug(urllib.parse.urlparse(stream.url.split("/")[-1]).path) or ""
+    else:
+        filename = slug(stream.url.split("/")[-1])
+
     filename_plain, ext = path.splitext(filename)
+
+    if len(filename_plain) > 120:
+        print("Warning: Long filename", filename_plain)
+        filename_plain = filename_plain[:120]
 
     if not filename_plain:
         # We are seeing the page from a directory, i.e. index.html
-        (dirname,) = re.search("/([^/]+)/$", stream.url).groups()
-        dirname = slug(dirname)
+        try:
+            (dirname,) = re.search("/([^/]+)/$", stream.url).groups()
+            dirname = slug(dirname)
 
-        if indexHack:
-            filename = path.join("..", dirname + ".html")
-        else:
-            filename = "index.html"
+            if indexHack:
+                filename = path.join("..", dirname + ".html")
+            else:
+                filename = "index.html"
+        except:
+            print(f"stream.url: {stream.url}")
+            raise
     elif not ext:
         filename = filename_plain + guessExtension(stream)
     return filename
