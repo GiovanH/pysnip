@@ -117,34 +117,43 @@ class Handler():
 
 
 class RotatingHandler(Handler):
+
     def load(self):
         try:
             self.obj = load(self.name, basepath=self.basepath)  # Don't handle failure; no default
             # File is good, so:
             self.backup()
             return self.obj
-        except (json.JSONDecodeError, FileNotFoundError):
+        except json.JSONDecodeError:
             print("Warning: data file '{}' corrupted. ".format(self.name))
-            if shutil.os.path.isfile(get_json_path(self.basepath, self.name)):
-                # If the file exists, but is corrupted
-                print("Deleting corrupted data")
-                shutil.os.remove(get_json_path(self.basepath, self.name))
-            if path.exists(get_json_path(self.basepath, self.name) + ".bak"):
-                # If backup exists
-                print("Restoring backup")
-                shutil.copy2(
-                    get_json_path(self.basepath, self.name) + ".bak",
-                    get_json_path(self.basepath, self.name)
-                ) 
-                self.obj = load(self.name, basepath=self.basepath)
-                return self.obj
-            elif self.default is not None:
-                self.obj = load(self.name, basepath=self.basepath, default=self.default)
-                return self.obj
-            else:
-                raise
+            return self.tryLoadBackup()
+        except (json.JSONDecodeError, FileNotFoundError):
+            print("Error: data file '{}' not present. ".format(self.name))
+            return self.tryLoadBackup()
+
+    def tryLoadBackup(self):
+        if shutil.os.path.isfile(get_json_path(self.basepath, self.name)):
+            # If the file exists, but is corrupted
+            print("Deleting corrupted data")
+            shutil.os.remove(get_json_path(self.basepath, self.name))
+        if path.exists(get_json_path(self.basepath, self.name) + ".bak"):
+            # If backup exists
+            print("Restoring backup")
+            shutil.copy2(
+                get_json_path(self.basepath, self.name) + ".bak",
+                get_json_path(self.basepath, self.name)
+            ) 
+            self.obj = load(self.name, basepath=self.basepath)
+            return self.obj
+        elif self.default is not None:
+            self.obj = load(self.name, basepath=self.basepath, default=self.default)
+            return self.obj
+        else:
+            raise
 
     def backup(self):
+        if self.readonly:
+            return
         # print("Backing up", self.name)
         if path.exists(get_json_path(self.basepath, self.name)):
             shutil.copy2(
