@@ -2,8 +2,11 @@
 
 import os
 import sys
-import logging
 from .hash import CRC32file
+
+from .stream import TriadLogger
+
+logger = TriadLogger(__name__)
 
 
 class Trash(object):
@@ -27,10 +30,10 @@ class Trash(object):
 
         self.trash_queue = []
         try:
-            from send2trash import send2trash
-            self._osTrash = send2trash
+            import send2trash
+            self._osTrash = send2trash.send2trash
         except ImportError:
-            print("send2trash unavailible, using unsafe delete", file=sys.stderr)
+            logger.warning("send2trash unavailible, using unsafe delete")
             self._osTrash = os.unlink
 
         self._spool = Spool(8, "os trash")
@@ -50,7 +53,7 @@ class Trash(object):
             self.commitDelete(path, crc)
 
     def isfile(self, path):
-        if path in [t[0] for t in self.trash_queue]:
+        if os.path.normpath(path) in [t[0] for t in self.trash_queue]:
             return False
         else:
             return os.path.isfile(path)
@@ -59,34 +62,35 @@ class Trash(object):
         tup = (path, crc)
         if os.path.isfile(path):
             if not CRC32file(path) == crc:
-                print("Warning! File changed. Not deleting file '%s'" % path)
+                logger.warning("File changed. Not deleting file '%s'" % path)
                 return
 
             self._spool.enqueue(self._osTrash, args=(path,))
             
             if self.verbose:
-                print("{} --> {} ({}) --> {}".format("[SNIPTRASH]", path, crc, "[OS TRASH]"))
+                logger.info("{} --> {} ({}) --> {}".format("[SNIPTRASH]", path, crc, "[OS TRASH]"))
 
         else:
-            print(f"warning: deleted file '{path}' disappeared from disk", file=sys.stderr)
+            logger.warning(f"deleted file '{path}' disappeared from disk")
         
         if tup in self.trash_queue:
             self.trash_queue.remove(tup)
         else:
-            print(f"warning: deleted file '{path}' not in trash!", file=sys.stderr)
+            logger.warning(f"deleted file '{path}' not in trash!")
 
     def delete(self, path):
+        path = os.path.normpath(path)
         if path in self.trash_queue:
-            print(f"warning: attempted to delete already trashed file '{path}'", file=sys.stderr)
+            logger.warning(f"attempted to delete already trashed file '{path}'")
             return False
         elif not os.path.isfile(path):
-            print(f"warning: attempted to delete non-existent file '{path}'", file=sys.stderr)
+            logger.warning(f"attempted to delete non-existent file '{path}'")
             return False
 
         crc = CRC32file(path)
         self.trash_queue.append((path, crc,))
         if self.verbose:
-            print("{} ({}) --> {}".format(path, crc, "[SNIPTRASH]"))
+            logger.info("{} ({}) --> {}".format(path, crc, "[SNIPTRASH]"))
         self.enforceQueueSize()
         return True
 
@@ -94,7 +98,7 @@ class Trash(object):
         if self.trash_queue:
             path = self.trash_queue.pop()
             if self.verbose:
-                print("{} <-- {}".format(path, "[SNIPTRASH]"))
+                logger.info("{} <-- {}".format(path, "[SNIPTRASH]"))
             return path
         else:
             return False
@@ -143,7 +147,7 @@ def renameFileOnly(source, destination, clobber=False, quiet=False, preserve_ext
         new_name_base, new_ext = path.splitext(new_name)
 
         if not (new_ext == "" or new_ext == old_ext):
-            print("WARNING: New name should not have a new extension while preserve_extension is True!")
+            logger.warning("WARNING: New name should not have a new extension while preserve_extension is True!")
 
         new_name = new_name_base + new_ext + old_ext
 
@@ -159,17 +163,19 @@ def opFileToDir(op, source, destination, clobber, quiet):
         nfiles = [new_file_name]
     else:
         nfiles = []
-    yfiles = [source]
-    yfolders = [destination]
-    _safetyChecks(yfiles=yfiles, yfolders=yfolders, nfiles=nfiles)
+    _safetyChecks(yfiles=[source], yfolders=[destination], nfiles=nfiles)
+    _pathsExistCheck(source_file=source, destination_dir=destination)
     return _doFileOp(op, source, destination, quiet)
 
 
 def opFileToFile(op, source, destination, clobber, quiet):
+    from os import path
     assert source != destination, "Paths are the same! " + source
     nfiles = [destination] if not clobber else []
     yfiles = [source]
+    destination_dir = path.split(destination)[0]
     _safetyChecks(yfiles=yfiles, nfiles=nfiles)
+    _pathsExistCheck(source_file=source, destination_dir=destination_dir)
     return _doFileOp(op, source, destination, quiet)
 
 
@@ -183,6 +189,22 @@ def opDirWithMerge(op, source, destination, clobber, quiet):
     _safetyChecks(yfolders=[source], nfolders=nfolders)
     return _doFileOp(op, source, destination, quiet)
 
+def _pathsExistCheck(source_file, destination_dir):
+    """Raises an error if source_file is bigger than destination_dir's free space
+    
+    Args:
+        source_file (str): Path to source file
+        destination_dir (str): Path to destination *directory*.
+    
+    Raises:
+        OSError: If there is not enough free space
+    """
+    from os import path
+    import shutil
+    file_size = path.getsize(source_file)
+    free_space = shutil.disk_usage(destination_dir).free
+    if free_space <= file_size:
+        raise OSError("Not enough space for operation!")
 
 def _safetyChecks(yfiles=[], yfolders=[], nfiles=[], nfolders=[]):
     from os import path
@@ -204,11 +226,11 @@ def _doFileOp(op, source, destination, quiet):
     try:
         result = op(source, destination)
         if not quiet:
-            print("{} --> {}".format(source, destination))
+            logger.info("{} --> {}".format(source, destination))
         return result
-    except Exception as e:
+    except Exception:
         if not quiet:
-            print("{} -x> {}".format(source, destination))
+            logger.error("{} -x> {}".format(source, destination), exc_info=True)
         raise
 
 
