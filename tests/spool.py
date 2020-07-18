@@ -46,9 +46,6 @@ class TestData(object):
 
 class ATestData(object):
 
-    async def test_fast(self):
-        return
-
     async def test_slow(self):
         work = []
 
@@ -69,6 +66,18 @@ class ATestData(object):
             for i in range(0, 20):
                 spool.enqueue(adowork([], 1, f"Saying {i}"))
 
+    async def test_recurse(self):
+        async def moreJobs(spool, prefix):
+            for i in range(0, 5):
+                spool.enqueue(adowork([], 1, f"Saying {prefix}.{i}"))
+            print("Spooled 5 more jobs")
+
+        async with AIOSpool(8, "print bar") as spool:
+            for i in range(0, 5):
+                spool.enqueue(adowork([], 1, f"Saying {i}"))
+                spool.enqueue(moreJobs(spool, i))
+
+
 async def adowork(work, i, say=None):
     time.sleep(.2)
     work.append(i)
@@ -77,7 +86,7 @@ async def adowork(work, i, say=None):
 
 async def asynciomain():
     orig_out, orig_out_err = sys.stdout, sys.stderr
-    await ATestData().test_fast()
+    await ATestData().test_recurse()
     await ATestData().test_print()
     await ATestData().test_slow()
     await AIOSpool(jobs=[adowork([], 1, f"Saying hi")]).finish()
@@ -87,9 +96,9 @@ async def asynciomain():
 
 if __name__ == '__main__':
     orig_out, orig_out_err = sys.stdout, sys.stderr
+    asyncio.run(asynciomain())
     # TestData().test_fast()
     # TestData().test_print()
     # TestData().test_slow()
     assert orig_out is sys.stdout
     assert orig_out_err is sys.stderr
-    asyncio.run(asynciomain())

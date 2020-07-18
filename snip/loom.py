@@ -14,6 +14,7 @@ import contextlib
 import sys
 import asyncio
 from tqdm.contrib import DummyTqdmFile
+import warnings
 
 
 class ThreadSpool():
@@ -27,7 +28,7 @@ class ThreadSpool():
     based on whether or not it's using a progress bar.
     """
 
-    def __init__(self, quota, name="Spool", belay=False, use_progbar=True):
+    def __init__(self, quota=8, name="Spool", belay=False, use_progbar=True):
         """Create a spool
 
         Args:
@@ -247,12 +248,12 @@ class ThreadSpool():
 
         # Start threads until we've hit quota, or until we're out of threads.
         # threads_to_queue =
-        while min(len(self.queue), self.quota - self.numRunningThreads) > 0:
+        while len(self.queue) > 0 and self.quota - self.numRunningThreads > 0:
             if verbose:
                 print(self)
             # for i in range(threads_to_queue):
             try:
-                self.startThread(self.queue.pop(0))
+                self.startThread(self.queue.pop())
             except IndexError:
                 print(f"IndexError: Popped from empty queue?\nWhile queueing thread {len(self.queue)}-{self.quota}-{self.numRunningThreads}")
                 break
@@ -273,7 +274,7 @@ class AIOSpool():
     based on whether or not it's using a progress bar.
     """
 
-    def __init__(self, jobs=[], name="AIOSpool", use_progbar=True):
+    def __init__(self, quota=8, jobs=[], name="AIOSpool", use_progbar=True):
         """Create a spool
 
         Args:
@@ -282,21 +283,28 @@ class AIOSpool():
         """
         self.name = name
         self.use_progbar = use_progbar
+        self.quota = quota
 
         self.started_threads = []
+        self.queue = []
 
         self._pbar_max = 0
 
         self.nop = (lambda: None)
-        self.on_finish_callback = self.nop
+        self.on_finish_callbacks = [
+            self._on_finish_callback
+        ]
 
         if type(jobs) == int:
-            import warnings
             warnings.warn("Jobs should be iterable, not an int! You're using queue syntax!")
             jobs = []
 
-        for job in jobs:
-            self.enqueue(job)
+        if iter(jobs) and type(jobs) is not str:
+            for job in jobs:
+                self.enqueue(job)
+        else:
+            warnings.warn("Jobs should be iterable! You're using the wrong init syntax!")
+            
 
     async def __aenter__(self):
         return self
@@ -335,17 +343,21 @@ class AIOSpool():
             print(self)
 
         # Progress bar management, optional.
+        # Wrap the existing callback
         def updateProgressBar():
             # Update progress bar.
             if use_pbar:
-                progress = (self._pbar_max - self.numActiveJobs)
+                q = (len(self.queue) if self.queue else 0)
+                progress = (self._pbar_max - (self.numActiveJobs + q))
 
                 progbar.total = self._pbar_max
                 progbar.n = progress
-                progbar.set_postfix(waiting=f"{self.numActiveJobs:2}]")
+                progbar.set_postfix(queue=q, waiting=f"{self.numActiveJobs:2}]")
                 progbar.update(0)
+        
+        self.on_finish_callbacks.insert(0, updateProgressBar)
 
-        self._pbar_max = len([j for j in self.started_threads if not j.done()])
+        self._pbar_max = self.numActiveJobs + len(self.queue)
 
         if self._pbar_max > 0:
             try:
@@ -358,11 +370,11 @@ class AIOSpool():
                         total=self._pbar_max,
                         unit="job"
                     )
-                    self.on_finish_callback = updateProgressBar
 
                     updateProgressBar()
 
-                await asyncio.gather(*self.started_threads)
+                while self.numActiveJobs:
+                    await asyncio.gather(*self.started_threads)
                 updateProgressBar()
 
                 assert self.numActiveJobs == 0, "Finished without finishing all threads"
@@ -374,7 +386,25 @@ class AIOSpool():
         if verbose:
             print(self)
 
-        self.on_finish_callback = self.nop
+        self.on_finish_callbacks.remove(updateProgressBar)
+
+    def on_finish_callback(self):
+        for c in self.on_finish_callbacks:
+            c()
+
+    def _on_finish_callback(self):
+        # While there is a queue
+        # This gets called from an ending job, so we don't count that one.
+        while len(self.queue) > 0 and (self.numActiveJobs - 1) < self.quota:
+            try:
+                # print(f"Starting job {len(self.queue)=} {self.numActiveJobs=} {self.quota=}")
+                future = self.queue.pop()
+                self.started_threads.append(asyncio.ensure_future(future))
+                
+            except IndexError:
+                print(f"IndexError: Popped from empty queue?\nWhile queueing thread {len(self.queue)}-{self.quota}-{self.numRunningThreads}")
+                break
+            # threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
 
     def enqueue(self, target):
         """Add a thread to the back of the queue.
@@ -395,8 +425,9 @@ class AIOSpool():
             except Exception:
                 print("Aborting spooled job", file=sys.stderr)
                 traceback.print_exc()
-        self.started_threads.append(asyncio.ensure_future(runAndFlag()))
+        self.queue.append(runAndFlag())
         self._pbar_max += 1
+        self.on_finish_callback()
 
     ##################
     # Minor utility
