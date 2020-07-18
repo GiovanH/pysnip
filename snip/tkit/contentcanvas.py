@@ -17,6 +17,7 @@ import collections
 import math
 import snip.filesystem
 import zipfile
+import threading
 
 
 from snip.stream import TriadLogger
@@ -405,7 +406,7 @@ class ContentCanvas(tk.Canvas):
         self.photoImageCache[filename] = pilimg
         logger.debug("Adding new photoimage to cache")
 
-        loom.thread(target=self.pruneImageCache, name="pruneImageCache")
+        threading.Thread(target=self.pruneImageCache, name="pruneImageCache").start()
         return ImageTk.PhotoImage(pilimg)
 
     def pruneImageCache(self, max_caches=6, max_memory_entries=100):
