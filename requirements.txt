@@ -8,3 +8,7 @@ pandas
 requests
 urllib3
 pywin32 
+send2trash
+aiofiles
+aiohttp
+timeout_decorator
