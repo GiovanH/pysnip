@@ -179,8 +179,12 @@ class ContentCanvas(tk.Canvas):
         """Update the display to match the current image index.
         """
 
+        normpath = os.path.normpath(filepath)
 
-        self.current_file = os.path.normpath(filepath)
+        if normpath == ".":
+            return
+
+        self.current_file = normpath
 
         # try:
         #     self.curimg = self.makePhotoImage(filepath)
@@ -299,6 +303,51 @@ class ContentCanvas(tk.Canvas):
         pilimg = Image.new('RGB', (10, 10), color=(0, 0, 0))
         ImageDraw.Draw(pilimg).text((2, 0), "?", fill=(255, 255, 255))
         return pilimg
+
+    def getInfoLabel(self):
+        if self.current_file == "":
+            return "No file"
+
+        prettyname = self.current_file
+        __, fileext = os.path.splitext(self.current_file)
+        if not os.path.isfile(self.current_file):
+            prettyname += " (Not Found)"
+            return prettyname
+        try:
+            filename = os.path.split(self.current_file)[1]
+            filesize = snip.strings.bytes_to_string(os.path.getsize(self.current_file))
+
+            (filename_, fileext) = os.path.splitext(filename)
+
+            # Get initial image
+            if fileext.lower() in _IMAGEEXTS:
+                frames = snip.image.framesInImage(self.current_file)
+                w, h = Image.open(self.current_file).size
+                if frames > 1:
+                    prettyname = f"{filename} [{frames}f]\n{filesize} [{w}x{h}px]"
+                else:
+                    prettyname = f"{filename}\n{filesize} [{w}x{h}px]"
+
+            elif fileext.lower() in _VIDEOEXTS:
+                capture = cv2.VideoCapture(self.current_file)
+                capture.grab()
+                flag, frame = capture.retrieve()
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                pilimg = Image.fromarray(frame)
+
+                w, h = pilimg.size
+                frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+                
+                prettyname = f"{filename} [{frames}f]\n{filesize} [{w}x{h}px]"
+
+            else:
+                raise OSError(f"Exception reading image '{prettyname}'")
+                prettyname = f"{filename}\n{filesize}"
+
+        except (OSError, cv2.error):
+            logger.error("OS error while getting file info", exc_info=True)
+            pass
+        return prettyname
 
     def makePhotoImage(self, filename, ALWAYS_RESIZE=True, stepsize=4):
         """Make a resized photoimage given a filepath
@@ -419,5 +468,5 @@ class ContentCanvas(tk.Canvas):
                 continue
             while len(cache) > max_memory_entries // 2:
                 dirty_item = list(cache.keys())[0]
-                logger.info(f"Cache too big, removing entry {dirty_item}")
+                # logger.info(f"Cache too big, removing entry {dirty_item}")
                 cache.pop(dirty_item)
