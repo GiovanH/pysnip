@@ -5,10 +5,17 @@ import sys
 from .hash import CRC32file
 
 from .stream import TriadLogger
+from collections import namedtuple
+from tempfile import _RandomNameSequence
 
 logger = TriadLogger(__name__)
 
 
+TrashEntry = namedtuple(
+    "TrashEntry", 
+    field_names=["path", "crc", "orig_path"],
+    defaults=[None, None, None]
+)
 class Trash(object):
 
     """Acts as a proxy for deleting files.
@@ -24,6 +31,8 @@ class Trash(object):
         super().__init__()
 
         from .loom import Spool
+
+        self.randomname = _RandomNameSequence()
 
         self.verbose = verbose
         self.queue_size = queue_size
@@ -49,8 +58,7 @@ class Trash(object):
 
     def enforceQueueSize(self):
         while len(self.trash_queue) > self.queue_size:
-            path, crc = self.trash_queue[0]
-            self.commitDelete(path, crc)
+            self.commitDelete(self.trash_queue[0])
 
     def isfile(self, path):
         if os.path.normpath(path) in [t[0] for t in self.trash_queue]:
@@ -58,9 +66,19 @@ class Trash(object):
         else:
             return os.path.isfile(path)
 
-    def commitDelete(self, path, crc):
-        tup = (path, crc)
-        if os.path.isfile(path):
+    def commitDelete(self, trashitem):
+        crc = trashitem.crc 
+        path = trashitem.path 
+
+        if os.path.isdir(path):
+            crc = "DIRECTORY"
+
+            self._spool.enqueue(self._osTrash, args=(path,))
+            
+            if self.verbose:
+                logger.info("{} --> {} --> {}".format("[SNIPTRASH]", trashitem, "[OS TRASH]"))
+
+        elif os.path.isfile(path):
             if not CRC32file(path) == crc:
                 logger.warning("File changed. Not deleting file '%s'" % path)
                 return
@@ -68,44 +86,86 @@ class Trash(object):
             self._spool.enqueue(self._osTrash, args=(path,))
             
             if self.verbose:
-                logger.info("{} --> {} ({}) --> {}".format("[SNIPTRASH]", path, crc, "[OS TRASH]"))
+                logger.info("{} --> {} --> {}".format("[SNIPTRASH]", trashitem, "[OS TRASH]"))
 
         else:
             logger.warning(f"deleted file '{path}' disappeared from disk")
         
-        if tup in self.trash_queue:
-            self.trash_queue.remove(tup)
+        if trashitem in self.trash_queue:
+            self.trash_queue.remove(trashitem)
         else:
             logger.warning(f"deleted file '{path}' not in trash!")
 
-    def delete(self, path):
+    def delete(self, path, rename=False):
         path = os.path.normpath(path)
-        if path in self.trash_queue:
+        if path in {item.path for item in self.trash_queue}:
             logger.warning(f"attempted to delete already trashed file '{path}'")
             return False
+        elif os.path.isdir(path):
+            return self.deleteDir(path)
         elif not os.path.isfile(path):
             logger.warning(f"attempted to delete non-existent file '{path}'")
             return False
 
-        crc = CRC32file(path)
-        self.trash_queue.append((path, crc,))
+        if rename:
+            while True:
+                renamed_path = path + ".trashed" + next(self.randomname)
+                if not os.path.isfile(renamed_path):
+                    break
+            moveFileToFile(path, renamed_path, clobber=False, quiet=not self.verbose)
+            entry = TrashEntry(
+                path=renamed_path,
+                crc=CRC32file(renamed_path),
+                orig_path=path
+            )
+        else:
+            entry = TrashEntry(
+                path=path,
+                crc=CRC32file(path)
+            )
+        self.trash_queue.append(entry)
         if self.verbose:
-            logger.info("{} ({}) --> {}".format(path, crc, "[SNIPTRASH]"))
+            logger.info("{} --> {}".format(entry, "[SNIPTRASH]"))
+        self.enforceQueueSize()
+        return True
+
+    def deleteDir(self, path):
+        path = os.path.normpath(path)
+        if path in {item.path for item in self.trash_queue}:
+            logger.warning(f"attempted to delete already trashed directory '{path}'")
+            return False
+
+        entry = TrashEntry(
+            path=path,
+            crc="DIRECTORY"
+        )
+        self.trash_queue.append(entry)
+        if self.verbose:
+            logger.info("{} --> {}".format(entry, "[SNIPTRASH]"))
         self.enforceQueueSize()
         return True
 
     def undo(self):
         if self.trash_queue:
-            path = self.trash_queue.pop()
+            entry = self.trash_queue.pop()
             if self.verbose:
-                logger.info("{} <-- {}".format(path, "[SNIPTRASH]"))
-            return path
+                logger.info("{} <-- {}".format(entry, "[SNIPTRASH]"))
+            if entry.orig_path:
+                moveFileToFile(entry.path, entry.orig_path, clobber=False, quiet=not self.verbose)
+                return entry.orig_path
+            else:
+                return entry.path
         else:
             return False
 
+    def flush(self):
+        """Commit all trash operations
+        """
+        for entry in self.trash_queue.copy():
+            self.commitDelete(entry)
+
     def finish(self):
-        for path, crc in self.trash_queue.copy():
-            self.commitDelete(path, crc)
+        self.flush()
         self._spool.finish()
 
 
