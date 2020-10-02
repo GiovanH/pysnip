@@ -47,7 +47,7 @@ class ThreadSpool():
         self._pbar_max = 0
         self.spoolThread = None
         self.background_spool = False
-        self.dirty = threading.Event()
+        self.may_have_room = threading.Event()
 
         if not belay:
             self.start()
@@ -59,6 +59,9 @@ class ThreadSpool():
         try:
             self.finish(resume=False)
         except KeyboardInterrupt:
+            print("Spool got KeyboardInterrupt")
+            self.background_spool = False
+            self.queue = []
             raise
 
     def __str__(self):
@@ -81,6 +84,7 @@ class ThreadSpool():
         if not (self.spoolThread and self.spoolThread.is_alive()):
             self.spoolThread = threading.Thread(target=self.spoolLoop, name="Spooler")
             self.spoolThread.start()
+            self.may_have_room.set()
 
     def cancel(self):
         """Abort immeditately, potentially without finishing threads.
@@ -101,7 +105,7 @@ class ThreadSpool():
 
         # Stop existing spools
         self.background_spool = False
-        self.dirty.set()
+        self.may_have_room.set() # If we were paused before
 
         if verbose:
             print(self)
@@ -112,13 +116,17 @@ class ThreadSpool():
             if use_pbar:
                 q = (len(self.queue) if self.queue else 0)
                 progress = (self._pbar_max - (self.numRunningThreads + q))
+                # progress = (self._pbar_max - q)
+                if progress < 0:
+                    # print(f"{progress=} {self._pbar_max=} {self.numRunningThreads=} {q=}")
+                    progress = 0
 
                 progbar.total = self._pbar_max
                 progbar.n = progress
                 progbar.set_postfix(queue=q, running=f"{self.numRunningThreads:2}/{self.quota}]")
                 progbar.update(0)
 
-        self._pbar_max = self.numRunningThreads + len(self.queue)
+        self._pbar_max = self.numRunningThreads + (len(self.queue) if self.queue else 0)
 
         if self._pbar_max > 0:
 
@@ -137,10 +145,8 @@ class ThreadSpool():
                 # assert not self.spoolThread.isAlive, "Background loop did not terminate"
                 # Create a spoolloop, but block until it deploys all threads.
                 while (self.queue and len(self.queue) > 0) or (self.numRunningThreads > 0):
-                    self.dirty.wait()
-                    self.doSpool(verbose=False)
-                    updateProgressBar()
-                    self.dirty.set()
+                    self.may_have_room.wait()
+                    self.doSpool(verbose=False, callbacks=[updateProgressBar])
                 updateProgressBar()
 
                 assert len(self.queue) == 0, "Finished without deploying all threads"
@@ -181,14 +187,14 @@ class ThreadSpool():
                 print("Aborting spooled thread", file=sys.stderr)
                 traceback.print_exc()
             finally:
-                self.dirty.set()
+                self.may_have_room.set()
         self.queue.append(threading.Thread(target=runAndFlag, *thargs, **thkwargs))
         self._pbar_max += 1
-        self.dirty.set()
+        # self.may_have_room.set()
 
     def setQuota(self, newQuota):
         self.quota = newQuota
-        self.dirty.set()
+        self.may_have_room.set()
 
     ##################
     # Minor utility
@@ -197,7 +203,7 @@ class ThreadSpool():
     def startThread(self, newThread):
         self.started_threads.append(newThread)
         newThread.start()
-        self.dirty.set()
+        # self.may_have_room.set()
 
     @property
     def numRunningThreads(self):
@@ -224,14 +230,15 @@ class ThreadSpool():
         Args:
             verbose (bool, optional): Report progress towards queue completion.
         """
+        
         while True:
-            self.dirty.wait()
+            self.may_have_room.wait()
             if not self.background_spool:
                 break
-            #   self.dirty.set()
+            #   self.may_have_room.set()
             self.doSpool(verbose=verbose)
 
-    def doSpool(self, verbose=False):
+    def doSpool(self, verbose=False, callbacks=[]):
         """Spools new threads until the queue empties or the quota fills.
 
         Args:
@@ -243,24 +250,36 @@ class ThreadSpool():
             if self.numRunningThreads == 0:
                 self.flushing = 0
             else:
-                self.dirty.clear()
+                # self.may_have_room.clear()
                 return
 
         # Start threads until we've hit quota, or until we're out of threads.
         # threads_to_queue =
+        # drawbuffer = 80
+        # drawbuffer_c = 0
         while len(self.queue) > 0 and self.quota - self.numRunningThreads > 0:
+            
             if verbose:
                 print(self)
-            # for i in range(threads_to_queue):
-            try:
-                self.startThread(self.queue.pop())
-            except IndexError:
-                print(f"IndexError: Popped from empty queue?\nWhile queueing thread {len(self.queue)}-{self.quota}-{self.numRunningThreads}")
-                break
+            threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
+            for i in range(threads_to_queue):
+                try:
+                    self.startThread(self.queue.pop())
+                except IndexError:
+                    print(f"IndexError: Popped from empty queue?\nWhile queueing thread {len(self.queue)}-{self.quota}-{self.numRunningThreads}")
+                    break
+            # don't draw too often
+            # drawbuffer_c += 1
+            # drawbuffer_c %= drawbuffer
+            # if drawbuffer_c == 0:
+            for callback in callbacks:
+                callback()
+
+        self.may_have_room.clear()
+
+        # for callback in callbacks:
+        #     callback()
             # threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
-
-        self.dirty.clear()
-
 
 
 class AIOSpool():
@@ -313,6 +332,9 @@ class AIOSpool():
         try:
             return await self.finish(resume=False)
         except KeyboardInterrupt:
+            print("Spool got KeyboardInterrupt")
+            self.background_spool = False
+            self.queue = []
             raise
 
     def __str__(self):
