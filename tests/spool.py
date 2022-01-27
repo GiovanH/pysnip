@@ -18,10 +18,10 @@ class TestData(object):
     def test_fast(self):
         work = []
         with Spool(8, "fast") as spool:
-            for i in range(0, 20):
+            for i in range(0, 5000):
                 spool.enqueue(work.append, (i,))
 
-        assert len(work) == 20
+        assert len(work) == 5000
 
     def test_slow(self):
         work = []
@@ -96,9 +96,9 @@ async def asynciomain():
 
 if __name__ == '__main__':
     orig_out, orig_out_err = sys.stdout, sys.stderr
-    asyncio.run(asynciomain())
-    # TestData().test_fast()
+    # asyncio.run(asynciomain())
+    TestData().test_fast()
     # TestData().test_print()
-    # TestData().test_slow()
+    TestData().test_slow()
     assert orig_out is sys.stdout
     assert orig_out_err is sys.stderr

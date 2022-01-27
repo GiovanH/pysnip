@@ -105,7 +105,7 @@ class ThreadSpool():
 
         # Stop existing spools
         self.background_spool = False
-        self.may_have_room.set() # If we were paused before
+        self.may_have_room.set()  # If we were paused before
 
         if verbose:
             print(self)
@@ -190,7 +190,7 @@ class ThreadSpool():
                 self.may_have_room.set()
         self.queue.append(threading.Thread(target=runAndFlag, *thargs, **thkwargs))
         self._pbar_max += 1
-        # self.may_have_room.set()
+        self.may_have_room.set()
 
     def setQuota(self, newQuota):
         self.quota = newQuota
@@ -311,7 +311,7 @@ class AIOSpool():
 
         self.nop = (lambda: None)
         self.on_finish_callbacks = [
-            self._on_finish_callback
+            self.doSpool
         ]
 
         if type(jobs) == int:
@@ -414,7 +414,7 @@ class AIOSpool():
         for c in self.on_finish_callbacks:
             c()
 
-    def _on_finish_callback(self):
+    def doSpool(self):
         # While there is a queue
         # This gets called from an ending job, so we don't count that one.
         while len(self.queue) > 0 and (self.numActiveJobs - 1) < self.quota:
@@ -443,10 +443,11 @@ class AIOSpool():
         async def runAndFlag():
             try:
                 await target
-                self.on_finish_callback()
             except Exception:
                 print("Aborting spooled job", file=sys.stderr)
                 traceback.print_exc()
+            finally:
+                self.on_finish_callback()
         self.queue.append(runAndFlag())
         self._pbar_max += 1
         self.on_finish_callback()
