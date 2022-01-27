@@ -172,7 +172,7 @@ class Trash(object):
 def easySlug(string, repl="-", directory=False):
     import re
     if directory:
-        return re.sub("^\.|\.+$", "", easySlug(string, repl=repl, directory=False))
+        return re.sub(r"^\.|\.+$", "", easySlug(string, repl=repl, directory=False))
     else:
         return re.sub(r"[\\\\/:*?\"<>|\t]|\ +$", repl, string)
 
