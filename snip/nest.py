@@ -1,29 +1,30 @@
 """Summary
 """
-from snip import jfileutil as ju
-from json.decoder import JSONDecodeError
+from . import jfileutil as ju
+# from json.decoder import JSONDecodeError
 
+from snip.stream import TriadLogger
+logger = TriadLogger(__name__)
 
 class Nest():
 
     """Wrapper for a series of nested dictionaries
-    
+
     Attributes:
         dictionary (dict): The dictionary this wraps
         identifier (str): The name of the JSON file backing the dict
     """
-    
-    def __init__(self, default=None):
+
+    def __init__(self, default={}):
         """Args:
             identifier (str): The name of the JSON file backing the dict
             default (dict, optional): Use this dictionary if file errors
             default (dict, optional): Load this dictionary and replace the file
         """
-        super(Nest, self).__init__()
-        if default is None:
-            self.dictionary = dict()
-        else:
-            self.dictionary = default
+        super().__init__()
+        # logger.info("Setting default dictionary")
+        # logger.debug(default)
+        self.dictionary = default
 
     def keys(self, root=None):
         if not root:
@@ -32,14 +33,14 @@ class Nest():
 
     def get(self, keypath="", default=None, root=None):
         """Summary
-        
+
         Args:
             key (str, optional): Key. Format is `[.]{dict.}key` Returns value.
             root (None, optional): Description
-        
+
         Returns:
             object: Value
-        
+
         Raises:
             KeyError: No path exists
             ValueError: No value exists
@@ -69,7 +70,7 @@ class Nest():
 
     def set(self, keypath, value, makepath=True):
         """Set a key to a value.
-        
+
         Args:
             key (str): Keypath
         """
@@ -95,11 +96,11 @@ class Nest():
 
     def flatten(self, key="", root=None, trees=False, leaves=True):
         """Returns a flat list 
-        
+
         Args:
             key (str, optional): Starting key. Defaults to root.
             root (dict, optional): Recursion
-        
+
         Yields:
             list: List of strings
         """
@@ -122,33 +123,39 @@ class Nest():
 
 class FsNest(Nest):
 
-    def __init__(self, identifier, default=None):
+    def __init__(self, identifier, **kwargs):
         """Args:
             identifier (str): The name of the JSON file backing the dict
             default (dict, optional): Use this dictionary if file errors
             load (dict, optional): Load this dictionary and replace the file
         """
-        super(Nest, self).__init__()
+        super().__init__(**kwargs)
         self.identifier = identifier
+        self.reload()
 
     def reload(self):
-        """Load json from file
+        """Load json from file, if identifier is set.
         """
-        self.dictionary = ju.load(self.identifier)
+        if (self.identifier):
+            try:
+                self.dictionary = ju.load(self.identifier)
+            except:
+                logger.warning(f"File for FsNest {self.identifier} does not exist, not loading.")
 
     def rename(self, newname):
         """Rename JSON file
-        
+
         Args:
             newname (str): New file identifier
         """
         self.identifier = newname
-        self.flush()
+        self.save()
 
     def save(self):
-        """Save data to file
+        """Save data to file, if identifier is set.
         """
-        ju.save(self.dictionary, self.identifier)
+        if (self.identifier):
+            ju.save(self.dictionary, self.identifier)
 
 
 def test():
