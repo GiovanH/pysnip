@@ -6,8 +6,19 @@ import requests
 import bs4
 import os
 from .filesystem import easySlug
+from .stream import TriadLogger
+import urllib.parse
+import re
+
+import atexit
+import asyncio
+import aiofiles
+import aiohttp
+
 
 OPTION_STRIPARGS = False
+
+# Stateless helpers
 
 def queryUrlToDict(url):
     from urllib.parse import urlparse, parse_qs
@@ -118,6 +129,7 @@ def getFilename(stream, indexHack=True, slug=easySlug):
 
     if not filename_plain:
         # We are seeing the page from a directory, i.e. index.html
+        url_parts = urllib.parse.urlsplit(stream.url)
         try:
             (dirname,) = re.search("/([^/]+)/$", stream.url).groups()
             dirname = slug(dirname)
@@ -125,10 +137,12 @@ def getFilename(stream, indexHack=True, slug=easySlug):
             if indexHack:
                 filename = path.join("..", dirname + ".html")
             else:
-                filename = "index.html"
-        except:
-            print(f"stream.url: {stream.url}")
-            raise
+                filename = f"index{url_parts.query}.html"
+        except AttributeError:
+            coerce = f"index{url_parts.query}.html"
+            print(f"stream.url: {stream.url} coerced to {coerce}")
+            # There is no directory name
+            return coerce
     elif not ext:
         filename = filename_plain + guessExtension(stream)
     return filename
@@ -175,7 +189,7 @@ def _saveChunked(path, response):
         with open(path, 'wb') as file:
             for chunk in response:
                 file.write(chunk)
-    except OSError:
+    except Exception:
         # Clean up partial file
         os.unlink(path)
         raise
@@ -191,3 +205,131 @@ def mirror(stream, dest_directory, nc=False, slug=easySlug):
     dest_directory = os.path.join(dest_directory, getMirrorDir(stream.url, slug))
     os.makedirs(dest_directory, exist_ok=True)
     return saveStreamTo(stream, dest_directory, nc=nc, indexHack=False)
+
+class AIODownloader(object):
+
+    def __init__(self, nc=False, indexhack=True, stripargs=False):
+        self.CHUNK_SIZE = 1024
+        self.logger = TriadLogger(type(self).__name__)
+        self.slug = easySlug
+
+        self.no_clobber = nc
+        self.indexhack = indexhack
+        self.stripargs = stripargs
+
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self  
+
+    async def __aexit__(self, *args):
+        await self.session.close()
+        return
+
+    async def getResponse(self, url, prev_url=None):
+        if prev_url: 
+            url = urllib.parse.urljoin(prev_url, url)
+        response = await self.session.get(url)
+        response.raise_for_status()
+        return response
+
+    async def saveChunked(self, file_path, response):
+        try:
+            # self.logger.info(f"Saving content to '{file_path}'")
+            async with aiofiles.open(file_path, 'wb') as fd:
+                async for data in response.content.iter_chunked(self.CHUNK_SIZE):
+                    await fd.write(data)
+            return True
+        except Exception:
+            os.unlink(file_path)
+            self.logger.error(f"Fatal error saving to {file_path}")  # , exc_info=True)
+            raise
+            # return False
+
+    async def saveAs(self, source, dest_path):
+        if isinstance(source, str):
+            # self.logger.info(f"Saving '{source}' as '{dest_path}'")
+            async with await self.getResponse(source) as response:
+                return await self.saveAs(response, dest_path)
+        else:
+            response = source
+
+        response_length = float(response.headers.get("Content-Length", -1))
+        if os.path.isfile(dest_path):
+            if self.no_clobber:
+                self.logger.info(f"Not overwriting same-name file at {dest_path}")
+                return False
+            if response_length == os.stat(dest_path).st_size:
+                self.logger.info(f"Not overwriting same-size file at {dest_path} (size {response_length})")
+                return False
+
+        return await self.saveChunked(dest_path, response)
+
+    async def saveTo(self, source, dest_dir, smart=True):
+        if isinstance(source, str):
+            async with await self.getResponse(source) as response:
+                return await self.saveTo(response, dest_dir, smart=smart)
+        else:
+            response = source
+
+        # Todo: May be better method for this?
+        print(response)
+        self.logger.info(response.url.path)
+        filename = self.slug(response.url.path.split("/")[-1])
+        if smart:
+            filename = await self.getFilename(response)
+
+        self.logger.info(f"Saving '{filename}' to '{dest_dir}'")
+
+        dest_path = os.path.join(dest_dir, filename)
+        await self.saveAs(response, dest_path)
+        return dest_path
+
+    async def getFilename(self, response):
+        disposition = response.headers.get("content-disposition")
+        if disposition:
+            # If the response has Content-Disposition, try to get filename from it
+            cd = dict(
+                map(
+                    lambda x: x.strip().split('=') if '=' in x else (x.strip(), ''),
+                    disposition.split(';')
+                )
+            )
+            if 'filename' in cd:
+                filename = urllib.parse.unquote(cd['filename'].strip("\"'"))
+                if filename:
+                    return self.slug(urllib.parse.unquote(filename))
+
+        # Filename is the page name
+        filename = self.slug(response.url.path.split("/")[-1])
+        if self.stripargs:
+            filename = urllib.parse.urlparse(filename).path or ""
+
+        filename_plain, ext = os.path.splitext(filename)
+
+        if len(filename_plain) > 120:
+            self.logger.warning("Long filename", filename_plain)
+            filename_plain = filename_plain[:120]
+
+        # Page name may be "" (index.html)
+        if filename == "":
+            try:
+                (dirname,) = re.search("/([^/]+)/$", response.url.path).groups()
+                dirname = self.slug(dirname)
+
+                if self.indexhack:
+                    filename = os.path.join("..", dirname + ".html")
+                else:
+                    filename = "index.html"
+            except Exception:
+                self.logger.error(f"Can't puzzle response.url.path: {response.url.path}")
+                raise
+        elif not ext:
+            # We have a page name, but not an extension.
+            filename = filename_plain + self.guessExtension(response)
+        return filename
+
+    def guessExtension(self, response):
+        from ._data import mime2ext
+        content_type = response.headers.get("Content-Type")
+        ext_match = mime2ext.get(content_type.split(";")[0], "")
+        return ext_match
