@@ -9,6 +9,7 @@ import os
 from .strings import timestamp
 
 import logging
+import logging.handlers
 
 
 def makeLogHandler(base, level, format_string):
@@ -18,44 +19,68 @@ def makeLogHandler(base, level, format_string):
     return h
 
 
-active_log_handlers = {}
-
-
 def TriadLogger(__name, stream=True, file=True, debug=True, retries=0):
-    global active_log_handlers
+    """Logger that outputs to stdout, a logfile, and a debug logfile with extra verbosity.
+    Use with logger = TriadLogger(__name__)
+
+    Also, tries to share file handlers, for multiple loggers running in the same program.
+
+    Args:
+        __name (TYPE): Description
+        stream (bool, optional): Whether to use stdout
+        file (bool, optional): Whether to use a logfile
+        debug (bool, optional): Whether to use a debug logfile
+    
+    Returns:
+        logger
+    """
+    def makeLogHandler(base, level, format_string):
+        h = base
+        h.setLevel(level)  
+        h.setFormatter(logging.Formatter(format_string, "%Y-%m-%d %H:%M:%S"))
+        return h
     
     logger = logging.getLogger(__name)
     logger.setLevel(logging.DEBUG)
 
-    progname = argv[0].replace('.py', '')
+    # depending on execution context, may not have an arg0?
+    progname = argv[0].replace('.py', '') or __name
+
+    # Handle multiple simultaneous processes
     if retries > 0:
         if retries > 20:
             raise Exception("Cannot open logfile! Too many instances open?")
-        progname = f"{progname}{retries}"
+        progname = f"{progname}{retries}" 
 
     filepath_normal = f"{progname}_latest.log"
     filepath_debug = f"{progname}_latest_debug.log"
 
     try:
-
-        if stream:
-            if not active_log_handlers.get("stream"):
-                active_log_handlers["stream"] = makeLogHandler(logging.StreamHandler(), logging.INFO, '[%(name)s] %(levelname)s: %(message)s')
-            logger.addHandler(active_log_handlers["stream"])
         
         if file:
-            if not active_log_handlers.get("file"):
-                if os.path.isfile(filepath_normal):
-                    shutil.move(filepath_normal, filepath_normal + ".bak")
-                active_log_handlers["file"] = makeLogHandler(logging.FileHandler(filepath_normal, mode="w"), logging.INFO, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-            logger.addHandler(active_log_handlers["file"])
+            if os.path.isfile(filepath_normal):
+                shutil.move(filepath_normal, filepath_normal + ".bak")
+            logger.addHandler(makeLogHandler(
+                logging.handlers.RotatingFileHandler(filepath_normal, mode="w"), 
+                logging.INFO, 
+                '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
+            ))
 
         if debug:
-            if not active_log_handlers.get("file_debug"):
-                if os.path.isfile(filepath_debug):
-                    shutil.move(filepath_debug, filepath_debug + ".bak")
-                active_log_handlers["file_debug"] = makeLogHandler(logging.FileHandler(filepath_debug, mode="w", encoding="utf-8"), logging.DEBUG, '%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-            logger.addHandler(active_log_handlers["file_debug"])
+            if os.path.isfile(filepath_debug):
+                shutil.move(filepath_debug, filepath_debug + ".bak")
+            logger.addHandler(makeLogHandler(
+                logging.handlers.RotatingFileHandler(filepath_debug, mode="w", encoding="utf-8"), 
+                logging.DEBUG, 
+                '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
+            ))
+
+        if stream:
+            logger.addHandler(makeLogHandler(
+                logging.StreamHandler(), 
+                logging.INFO, 
+                '[%(name)s] %(levelname)s: %(message)s'
+            ))
 
         return logger
 
