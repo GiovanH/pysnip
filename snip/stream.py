@@ -6,11 +6,21 @@ from sys import argv
 import shutil
 import os
 
-from .strings import timestamp
-
 import logging
 import logging.handlers
 
+
+
+def timestamp():
+    """Just give a human-readable timestamp.
+    Format is %Y-%m-%d %I:%M%p, i.e. "2018-01-02 9:12 PM"
+
+    Returns:
+        str: Timestamp
+    """
+    import datetime
+
+    return datetime.datetime.now().strftime("%Y-%m-%d %I:%M%p")
 
 def makeLogHandler(base, level, format_string):
     h = base

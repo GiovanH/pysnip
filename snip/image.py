@@ -6,7 +6,7 @@ def framesInImage(im):
     try:
         im = Image.open(im)
     except OSError:
-        return -1
+        return 1
     try:
         while True:
             frames = im.tell() 

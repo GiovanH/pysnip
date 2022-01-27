@@ -60,7 +60,7 @@ def elvisget(root, default, *chain):
         for link in chain:
             _root = _root.get(link)
         return _root
-    except (AttributeError) as e:
+    except AttributeError:
         return default
 
 
@@ -70,5 +70,5 @@ def elvisattr(root, default, *chain):
         for link in chain:
             _root = _root.__getattribute__(link) or _root.__getattr__(link)
         return _root
-    except (AttributeError) as e:
+    except AttributeError:
         return default
