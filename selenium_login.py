@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import TimeoutException, WebDriverException
 import os
 import subprocess
@@ -28,6 +29,10 @@ def loadBrowser():
 
     capabilities = {
         'browserName': 'chrome',
+        # 'logPrefs': "PERFORMANCE",
+        'loggingPrefs': {"performance": "ALL"},
+        'goog:loggingPrefs': {"performance": "ALL"},
+        'goog:chromeOptions': {'perfLoggingPrefs': {'enableNetwork': True}},
         "chromeOptions": {
             "binary": chrome_binary
         }
@@ -41,7 +46,7 @@ def loadBrowser():
     return browser
 
 
-def login(start, until):
+def login(start, until, giveinstance=False):
     try:
         browser = loadBrowser()
 
@@ -61,12 +66,13 @@ def login(start, until):
             "sessionStorage": browser.execute_script("return window.sessionStorage"),
             "location": browser.execute_script("return window.location.href")
         }
-        browser.quit()
     except WebDriverException:
         import pyperclip
         print(f"Fallback: Please copy cookies.txt from site {start} and press enter.")
         input()
         cookiestxt = pyperclip.paste()
+
+        browser = False
 
         cookies = {}
         for line in cookiestxt.split("\n"):
@@ -81,4 +87,9 @@ def login(start, until):
             "sessionStorage": "UNIMPLEMENTED",
             "location": "UNIMPLEMENTED"
         }
-    return sessiondata
+    if giveinstance:
+        return browser
+    else:
+        if browser:
+            browser.quit()
+        return sessiondata
