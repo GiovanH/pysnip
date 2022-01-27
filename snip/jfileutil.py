@@ -17,6 +17,8 @@ import shutil
 basepath_json = "./jobj/" 
 basepath_pick = "./obj/" 
 
+from .stream import TriadLogger
+logger = TriadLogger(__name__)
 
 # def load(filename):
 #     """Args:
@@ -47,11 +49,11 @@ def json_load(filename, basepath=basepath_json, default=None):
     """
     json_path = get_json_path(basepath, filename)
     try:
-        with open(json_path, 'r') as file:
+        with open(json_path, 'r', encoding="utf-8") as file:
             return json.load(file)
     except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
         # raise
-        print("Error with file", json_path)
+        logger.error("Error with file '%s'", json_path)
         # traceback.print_exc()
         if default is not None:
             # print("Load failed for file", filename, "; defaulting.")
@@ -95,6 +97,7 @@ class Handler():
         self.default = default
         self.readonly = readonly
         self.basepath = basepath
+        # self.last_state = None
         self.obj = None
 
     def load(self):
@@ -102,18 +105,33 @@ class Handler():
 
     def __enter__(self):
         self.obj = self.load()
+        # self.last_state = self.getState()
         return self.obj
 
     def __exit__(self, type, value, traceback):
         if not self.readonly:
             self.flush()
 
+    def getState(self):
+        # print("hashing")
+        state = hash(json.dumps(self.obj, sort_keys=True))
+        # print("hashed")
+        return state
+
     def flush(self):
         if self.readonly:
             raise NotImplemented("Cannot save if readonly is True.")
         else:
-            print("Saving", self.name)
-            save(self.obj, self.name, basepath=self.basepath)
+            if False:
+                pass
+            # current_state = self.getState()
+            # if self.last_state != None and self.last_state == current_state:
+            #     pass
+            else:
+                logger.info("Saving '%s'", self.name)
+                # logger.debug("Saving '%s' (state changed, %s != %s)", self.name, current_state, self.last_state)
+                save(self.obj, self.name, basepath=self.basepath)
+            # self.last_state = current_state
 
 
 class RotatingHandler(Handler):
@@ -125,20 +143,20 @@ class RotatingHandler(Handler):
             self.backup()
             return self.obj
         except json.JSONDecodeError:
-            print("Warning: data file '{}' corrupted. ".format(self.name))
+            logger.warning("Warning: data file '{}' corrupted. ".format(self.name))
             return self.tryLoadBackup()
         except (json.JSONDecodeError, FileNotFoundError):
-            print("Error: data file '{}' not present. ".format(self.name))
+            logger.warning("Error: data file '{}' not present. ".format(self.name))
             return self.tryLoadBackup()
 
     def tryLoadBackup(self):
         if shutil.os.path.isfile(get_json_path(self.basepath, self.name)):
             # If the file exists, but is corrupted
-            print("Deleting corrupted data")
+            logger.warning("Deleting corrupted data")
             shutil.os.remove(get_json_path(self.basepath, self.name))
         if path.exists(get_json_path(self.basepath, self.name) + ".bak"):
             # If backup exists
-            print("Restoring backup")
+            logger.warning("Restoring backup")
             shutil.copy2(
                 get_json_path(self.basepath, self.name) + ".bak",
                 get_json_path(self.basepath, self.name)
