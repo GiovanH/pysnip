@@ -353,6 +353,7 @@ class ListFrame(tk.Frame):
 
         self.columnconfigure(0, weight=1)
         self.vars = []
+        self.controls = []
         row = 0
         list_.append("")
         for value in list_:
@@ -369,9 +370,26 @@ class ListFrame(tk.Frame):
             else:
                 print("Bad variable type", value)
             control.grid(row=row, column=1, sticky="ew")
+            control.bind("<KeyRelease>", self.adjustListSize)
             self.vars.append(var)
+            self.controls.append(control)
         row += 1
         ttk.Separator(self).grid(row=row, column=0, columnspan=2, sticky="ew")
+
+    def adjustListSize(self, event):
+        print(event)
+        print(self.controls)
+        source = event.widget
+        print(self.controls.index(source), len(self.controls))
+        if self.controls.index(source) == len(self.controls) - 1:
+            if source.get() != "":
+                var = tk.StringVar(value='')
+                control = ttk.Entry(self, textvariable=var)
+                control.grid(row=len(self.controls)+1, column=1, sticky="ew")
+                control.bind("<KeyRelease>", self.adjustListSize)
+                self.vars.append(var)
+                self.controls.append(control)
+
 
     def get(self):
         r = []
