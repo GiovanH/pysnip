@@ -144,6 +144,7 @@ class ContentCanvas(tk.Canvas):
             initialfile=os.path.basename(self.current_file)
         )
         snip.filesystem.copyFileToFile(self.current_file, newFileName)
+        logger.info(f"{self.current_file} -> {newFileName}")
 
     def quicksave(self, event=None) -> None:
         downloads = snip.filesystem.userProfile("Pictures")
