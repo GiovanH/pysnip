@@ -5,6 +5,7 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 import os
 import subprocess
 import sys
+import traceback
 
 from math import inf as infinity
 
@@ -17,9 +18,13 @@ except (NameError, AssertionError):
 
 def loadBrowser():
 
-    chrome_binary = os.path.join(os.path.split(__file__)[0], r"chrome/bin/chrome.exe")
-    chrome_updater = os.path.join(os.path.split(__file__)[0], "chrome/chrlauncher 2.5.4 (64-bit).exe")
-    chromedriver_binary = os.path.join(os.path.split(__file__)[0], "chrome/bin/chromedriver.exe")
+    # chrome_binary = os.path.join(os.path.split(__file__)[0], r"chrome/chrlauncher/64/bin/chrome.exe")
+    chrome_binary = r"C:\Users\Seth\AppData\Local\Google\Chrome SxS\Application\chrome.exe"
+    # chrome_updater = os.path.join(os.path.split(__file__)[0], "chrome/chrlauncher/64/chrlauncher.exe")
+    # TODO:  wget https://storage.googleapis.com/chrome-for-testing-public/127.0.6485.0/win64/chromedriver-win64.zip
+
+    # chromedriver_binary = os.path.join(os.path.split(__file__)[0], "chrome/chrlauncher/64/bin/chromedriver.exe")
+    chromedriver_binary = r"C:\Users\Seth\AppData\Local\Google\Chrome SxS\Application\chromedriver.exe"
 
     sys.path.append(os.path.split(__file__)[0])
 
@@ -67,6 +72,7 @@ def login(start, until, giveinstance=False):
             "location": browser.execute_script("return window.location.href")
         }
     except WebDriverException:
+        traceback.print_exc()
         import pyperclip
         print(f"Fallback: Please copy cookies.txt from site {start} and press enter.")
         input()
