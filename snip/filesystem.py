@@ -4,11 +4,13 @@ import os
 import sys
 from .hash import CRC32file
 
-from .stream import TriadLogger
+# from .stream import TriadLogger
 from collections import namedtuple
 from tempfile import _RandomNameSequence
 
-logger = TriadLogger(__name__)
+import logging
+logger = logging.getLogger(__name__)
+# logger = TriadLogger(__name__)
 
 
 TrashEntry = namedtuple(
@@ -45,7 +47,7 @@ class Trash(object):
             logger.warning("send2trash unavailible, using unsafe delete")
             self._osTrash = os.unlink
 
-        self._spool = Spool(8, "os trash")
+        self._spool = Spool(4, "os trash")
 
     def __enter__(self):
         return self
@@ -109,6 +111,7 @@ class Trash(object):
 
         if rename:
             while True:
+                # tempfile.mktemp()
                 renamed_path = path + ".trashed" + next(self.randomname)
                 if not os.path.isfile(renamed_path):
                     break
@@ -282,7 +285,7 @@ def _safetyChecks(yfiles=[], yfolders=[], nfiles=[], nfolders=[]):
             raise FileExistsError(folder)
 
 
-def _doFileOp(op, source, destination, quiet):
+def _doFileOp(op, source: str, destination: str, quiet):
     try:
         result = op(source, destination)
         if not quiet:
@@ -294,7 +297,7 @@ def _doFileOp(op, source, destination, quiet):
         raise
 
 
-def copyFileToDir(source, destination, clobber=False, quiet=False):
+def copyFileToDir(source: str, destination: str, clobber=False, quiet=False):
     """Copies file `source` to folder `destination`.
 
     Args:
@@ -310,7 +313,7 @@ def copyFileToDir(source, destination, clobber=False, quiet=False):
     return opFileToDir(shutil.copy2, source, destination, clobber, quiet)
 
 
-def copyFileToFile(source, destination, clobber=False, quiet=False):
+def copyFileToFile(source: str, destination: str, clobber=False, quiet=False):
     """Copies file `source` to file `destination`.
 
     Args:
@@ -326,7 +329,7 @@ def copyFileToFile(source, destination, clobber=False, quiet=False):
     return opFileToFile(shutil.copy2, source, destination, clobber, quiet)
 
 
-def copyDirToParent(source, destination, clobber=False, quiet=False):
+def copyDirToParent(source: str, destination: str, clobber=False, quiet=False):
     """Copies directory `source` to `destination`. `source` will become a subfolder of `destination`.
 
     Args:
@@ -342,7 +345,7 @@ def copyDirToParent(source, destination, clobber=False, quiet=False):
     return opDirToParent(shutil.copy2, source, destination, clobber, quiet)
 
 
-def copyDirWithMerge(source, destination, clobber=False, quiet=False):
+def copyDirWithMerge(source: str, destination: str, clobber=False, quiet=False):
     """Copies directory `source` to `destination`. If `destination` is a directory, the two are merged.
 
     Args:
@@ -358,7 +361,7 @@ def copyDirWithMerge(source, destination, clobber=False, quiet=False):
     return opDirWithMerge(copy_tree, source, destination, clobber, quiet)
 
 
-def _copyTreeAndRemove(source, destination):
+def _copyTreeAndRemove(source: str, destination: str):
     """Summary
 
     Args:
@@ -372,7 +375,7 @@ def _copyTreeAndRemove(source, destination):
     return result
 
 
-def moveFileToDir(source, destination, clobber=False, quiet=False):
+def moveFileToDir(source: str, destination: str, clobber=False, quiet=False):
     """Moves file `source` to folder `destination`.
 
     Args:
@@ -388,7 +391,7 @@ def moveFileToDir(source, destination, clobber=False, quiet=False):
     return opFileToDir(shutil.move, source, destination, clobber, quiet)
 
 
-def moveFileToFile(source, destination, clobber=False, quiet=False):
+def moveFileToFile(source: str, destination: str, clobber=False, quiet=False):
     """Moves file `source` to file `destination`.
 
     Args:
@@ -404,7 +407,7 @@ def moveFileToFile(source, destination, clobber=False, quiet=False):
     return opFileToFile(shutil.move, source, destination, clobber, quiet)
 
 
-def moveDirToParent(source, destination, clobber=False, quiet=False):
+def moveDirToParent(source: str, destination: str, clobber=False, quiet=False):
     """Moves directory `source` to `destination`. `source` will become a subfolder of `destination`.
 
     Args:
@@ -420,7 +423,7 @@ def moveDirToParent(source, destination, clobber=False, quiet=False):
     return opDirToParent(shutil.move, source, destination, clobber, quiet)
 
 
-def moveDirWithMerge(source, destination, clobber=False, quiet=False):
+def moveDirWithMerge(source: str, destination: str, clobber=False, quiet=False):
     """Moves directory `source` to `destination`. If `destination` is a directory, the two are merged.
 
     Args:

@@ -18,6 +18,37 @@ def setListBox(listbox, values):
         listbox.insert(tk.END, xstr(val, nonestr=""))
 
 
+class SelectDialog(Dialog):
+
+    def __init__(self, parent, label, options):
+        self.label = label
+        self.options = options
+        self.result = None
+        self.picker = None
+
+        super().__init__(parent=parent)
+
+    def body(self, master):
+
+        labeltext = self.label
+        options = self.options
+        i = 0  # Only one row
+
+        tk.Label(master, text=labeltext).grid(column=0, row=i)
+
+        self.picker = picker = ttk.Combobox(master, values=options)
+        picker.grid(column=1, row=i, sticky="ew")
+        picker.current(0)
+        picker.focus()
+        picker.config(width=max([len(v) for v in options]))
+
+        master.columnconfigure(1, weight=1)
+        master.pack(padx=5, pady=5, fill="x")
+
+    def apply(self):
+        self.result = self.picker.get()
+
+
 class MultiSelectDialog(Dialog):
 
     def __init__(self, parent, labels, option_lists, stagger_lists=False):
@@ -396,7 +427,7 @@ class ListFrame(tk.Frame):
         for var in self.vars:
             print(r)
             val = var.get()
-            if val is "":
+            if val == "":
                 continue
             if isinstance(val, str):
                 if val.isnumeric():

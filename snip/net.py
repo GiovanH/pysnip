@@ -61,8 +61,12 @@ def getStream(url, prev_url=None):
         Requests stream
     """
     url = urllib.parse.urljoin(prev_url, url)
-    stream = requests.get(url, stream=True)
-    stream.raise_for_status()
+    stream = requests.get(url, headers={"User-Agent": "curl/8.7.1"}, stream=True)
+    try:
+        stream.raise_for_status()
+    except:
+        print(stream, stream.content, stream.text, stream.headers)
+        raise
     return stream
 
 
@@ -161,7 +165,7 @@ def saveStreamTo(stream, dest_directory, autoExt=True, nc=False, verbose=False, 
     Args:
         stream (TYPE): Description
         dest_directory (str): Local directory path
-        autoExt (bool, optional): Automatically append an extension 
+        autoExt (bool, optional): Automatically append an extension
             based on the MIME type
 
     Returns:
@@ -182,8 +186,8 @@ def _saveChunked(path, response):
     """Save a binary stream to a path. Dumb.
 
     Args:
-        path (str): 
-        response (response): 
+        path (str):
+        response (response):
     """
     try:
         with open(path, 'wb') as file:
@@ -219,14 +223,14 @@ class AIODownloader(object):
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
-        return self  
+        return self
 
     async def __aexit__(self, *args):
         await self.session.close()
         return
 
     async def getResponse(self, url, prev_url=None):
-        if prev_url: 
+        if prev_url:
             url = urllib.parse.urljoin(prev_url, url)
         response = await self.session.get(url)
         response.raise_for_status()
