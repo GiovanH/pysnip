@@ -22,8 +22,8 @@ def execif(function, args=tuple(), kwargs=dict(), condition=lambda f=None: bool(
 
 def slowfunc(delay, func, args=[], kwargs={}):
     """A wrapper that simply throttles another generator or iterable.
-    Note that this sets a minimum time, and may be invisible for slow functions. 
-    
+    Note that this sets a minimum time, and may be invisible for slow functions.
+
     Args:
         delay (int): Minimum time, in seconds
         func (Callable): Description
@@ -32,8 +32,10 @@ def slowfunc(delay, func, args=[], kwargs={}):
     """
     from time import time, sleep
     last = time()
-    func(*args, **kwargs)
+    # print("Sleeping...")
     sleep(max(0, (delay - (time() - last))))
+    ret = func(*args, **kwargs)
+    return ret
 
 
 def slow(iterable, delay):
