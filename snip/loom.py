@@ -8,13 +8,13 @@ Attributes:
 """
 
 import threading
-import tqdm
 import traceback
-import contextlib
 import sys
 import asyncio
-from tqdm.contrib import DummyTqdmFile
 import warnings
+
+import tqdm
+from tqdm.contrib import DummyTqdmFile
 
 
 class ThreadSpool():
@@ -55,7 +55,7 @@ class ThreadSpool():
     def __enter__(self):
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type_, value, traceback):
         try:
             self.finish(resume=False)
         except KeyboardInterrupt:
@@ -78,7 +78,7 @@ class ThreadSpool():
             print(*args, **kwargs)
 
     def start(self):
-        """Begin spooling threads in the background, if not already doing so. 
+        """Begin spooling threads in the background, if not already doing so.
         """
         self.background_spool = True
         if not (self.spoolThread and self.spoolThread.is_alive()):
@@ -149,8 +149,11 @@ class ThreadSpool():
                     self.doSpool(verbose=False, callbacks=[updateProgressBar])
                 updateProgressBar()
 
-                assert len(self.queue) == 0, "Finished without deploying all threads"
-                assert self.numRunningThreads == 0, "Finished without finishing all threads"
+                if not len(self.queue) == 0:
+                    raise AssertionError("Finished without deploying all threads")
+                if not self.numRunningThreads == 0:
+                    raise AssertionError("Finished without finishing all threads")
+
             finally:
                 if use_pbar:
                     progbar.close()
@@ -164,11 +167,11 @@ class ThreadSpool():
             print(self)
 
     def flush(self):
-        """Start and finishes all current threads before starting any new ones. 
+        """Start and finishes all current threads before starting any new ones.
         """
         self.flushing = 1
 
-    def enqueue(self, target, args=tuple(), kwargs=dict(), *thargs, **thkwargs):
+    def enqueue(self, target, args=None, kwargs=None, *thargs, **thkwargs):
         """Add a thread to the back of the queue.
 
         Args:
@@ -180,10 +183,13 @@ class ThreadSpool():
             *thargs: Args for threading.Thread
             **thkwargs: Kwargs for threading.Thread
         """
+        args = args or tuple()
+        kwargs = kwargs or dict()
+
         def runAndFlag():
             try:
                 target(*args, **kwargs)
-            except Exception:
+            except:  # noqa: E722
                 print("Aborting spooled thread", file=sys.stderr)
                 traceback.print_exc()
             finally:
@@ -192,17 +198,17 @@ class ThreadSpool():
         self._pbar_max += 1
         self.may_have_room.set()
 
-    def setQuota(self, newQuota):
-        self.quota = newQuota
+    def setQuota(self, new_quota):
+        self.quota = new_quota
         self.may_have_room.set()
 
     ##################
     # Minor utility
     ##################
 
-    def startThread(self, newThread):
-        self.started_threads.append(newThread)
-        newThread.start()
+    def startThread(self, new_thread):
+        self.started_threads.append(new_thread)
+        new_thread.start()
         # self.may_have_room.set()
 
     @property
@@ -238,12 +244,14 @@ class ThreadSpool():
             #   self.may_have_room.set()
             self.doSpool(verbose=verbose)
 
-    def doSpool(self, verbose=False, callbacks=[]):
+    def doSpool(self, verbose=False, callbacks=None):
         """Spools new threads until the queue empties or the quota fills.
 
         Args:
             verbose (bool, optional): Verbose output
         """
+
+        callbacks = callbacks or []
 
         if self.flushing == 1:
             # Finish running threads
@@ -279,7 +287,7 @@ class ThreadSpool():
 
         # for callback in callbacks:
         #     callback()
-            # threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
+        #     # threads_to_queue = min(len(self.queue), self.quota - self.numRunningThreads)
 
 
 class AIOSpool():
@@ -293,13 +301,15 @@ class AIOSpool():
     based on whether or not it's using a progress bar.
     """
 
-    def __init__(self, quota=8, jobs=[], name="AIOSpool", use_progbar=True):
+    def __init__(self, quota=8, jobs=None, name="AIOSpool", use_progbar=True):
         """Create a spool
 
         Args:
             quota (int): Size of quota, i.e. how many threads can run at once.
             cfinish (dict, optional): Description
         """
+        jobs = jobs or []
+
         self.name = name
         self.use_progbar = use_progbar
         self.quota = quota
@@ -314,21 +324,20 @@ class AIOSpool():
             self.doSpool
         ]
 
-        if type(jobs) == int:
+        if isinstance(jobs, int):
             warnings.warn("Jobs should be iterable, not an int! You're using queue syntax!")
             jobs = []
 
-        if iter(jobs) and type(jobs) is not str:
+        if iter(jobs) and not isinstance(jobs, str):
             for job in jobs:
                 self.enqueue(job)
         else:
             warnings.warn("Jobs should be iterable! You're using the wrong init syntax!")
             
-
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, type, value, traceback):
+    async def __aexit__(self, type_, value, traceback):
         try:
             return await self.finish(resume=False)
         except KeyboardInterrupt:
@@ -399,7 +408,8 @@ class AIOSpool():
                     await asyncio.gather(*self.started_threads)
                 updateProgressBar()
 
-                assert self.numActiveJobs == 0, "Finished without finishing all threads"
+                if not self.numActiveJobs == 0:
+                    raise AssertionError("Finished without finishing all threads")
             finally:
                 if use_pbar:
                     progbar.close()
@@ -443,7 +453,7 @@ class AIOSpool():
         async def runAndFlag():
             try:
                 await target
-            except Exception:
+            except:
                 print("Aborting spooled job", file=sys.stderr)
                 traceback.print_exc()
             finally:
